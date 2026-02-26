@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-import TopNav from '@/components/TopNav';
+import { useState, useRef, useEffect, useCallback, ReactNode } from 'react';
+import { HeartPulse, Brain, Droplets, Thermometer, Calendar, Pill, FlaskConical, Clock, User, Stethoscope, ClipboardList, ShieldAlert, Mic, ArrowUp, Paperclip, Settings, Volume2, AlertTriangle, RefreshCw, ChevronLeft, ChevronDown, CheckCircle2, X, PhoneCall } from 'lucide-react';
 import EmmaLogo from '@/components/EmmaLogo';
 import { useVoice } from '@/hooks/useVoice';
 import { ConversationState, AgentType, IntentType, UrgencyLevel } from '@/lib/types';
@@ -24,25 +24,25 @@ interface ChatMessage {
 }
 
 const SCENARIOS = [
-    { icon: '🔴', label: 'Chest Pain', msg: "I've been having really bad chest pains for about 20 minutes. It feels like a heaviness and my left arm is tingling." },
-    { icon: '😰', label: 'Mental Health', msg: "I've been feeling really low lately. I can't see the point anymore and I've been thinking about ending it all." },
-    { icon: '🤒', label: 'UTI', msg: "Hi, I think I might have a water infection. I've been having a burning sensation and going to the toilet a lot more." },
-    { icon: '🤕', label: 'Headache', msg: "I've had a terrible headache for 3 days that won't go away, even with paracetamol. I'm also feeling dizzy." },
-    { icon: '📅', label: 'Appointment', msg: "Hi, I'd like to book a GP appointment please. Nothing urgent, I just need a general check-up." },
-    { icon: '💊', label: 'Prescription', msg: "I need to order my repeat prescription. My name is Margaret Wilson, date of birth 18th March 1954. I need my Amlodipine." },
-    { icon: '🔬', label: 'Test Results', msg: "I'm David Patel, born 3rd December 1975. I had blood tests last week and I'm calling for the results." },
-    { icon: '🕐', label: 'Hours', msg: "What time are you open? And where is the nearest pharmacy?" },
-    { icon: '👤', label: 'Human', msg: "I'd rather speak to a real person please." },
+    { icon: <HeartPulse size={16} />, label: 'Chest Pain', msg: "I've been having really bad chest pains for about 20 minutes. It feels like a heaviness and my left arm is tingling." },
+    { icon: <Brain size={16} />, label: 'Mental Health', msg: "I've been feeling really low lately. I can't see the point anymore and I've been thinking about ending it all." },
+    { icon: <Droplets size={16} />, label: 'UTI', msg: "Hi, I think I might have a water infection. I've been having a burning sensation and going to the toilet a lot more." },
+    { icon: <Thermometer size={16} />, label: 'Headache', msg: "I've had a terrible headache for 3 days that won't go away, even with paracetamol. I'm also feeling dizzy." },
+    { icon: <Calendar size={16} />, label: 'Appointment', msg: "Hi, I'd like to book a GP appointment please. Nothing urgent, I just need a general check-up." },
+    { icon: <Pill size={16} />, label: 'Prescription', msg: "I need to order my repeat prescription. My name is Margaret Wilson, date of birth 18th March 1954. I need my Amlodipine." },
+    { icon: <FlaskConical size={16} />, label: 'Test Results', msg: "I'm David Patel, born 3rd December 1975. I had blood tests last week and I'm calling for the results." },
+    { icon: <Clock size={16} />, label: 'Hours', msg: "What time are you open? And where is the nearest pharmacy?" },
+    { icon: <User size={16} />, label: 'Human', msg: "I'd rather speak to a real person please." },
 ];
 
-const AGENTS: Record<string, { icon: string; label: string; color: string }> = {
-    orchestrator: { icon: '🧠', label: 'Orchestrator', color: '#7C3AED' },
-    triage: { icon: '🏥', label: 'Clinical Triage', color: '#3B82F6' },
-    appointment: { icon: '📅', label: 'Appointments', color: '#22C55E' },
-    prescription: { icon: '💊', label: 'Prescriptions', color: '#F97316' },
-    test_results: { icon: '🔬', label: 'Test Results', color: '#14B8A6' },
-    admin: { icon: '📋', label: 'Admin', color: '#8B5CF6' },
-    escalation: { icon: '🚨', label: 'Escalation', color: '#EF4444' },
+const AGENTS: Record<string, { icon: ReactNode; label: string; color: string }> = {
+    orchestrator: { icon: <Brain size={16} />, label: 'Orchestrator', color: '#7C3AED' },
+    triage: { icon: <Stethoscope size={16} />, label: 'Clinical Triage', color: '#3B82F6' },
+    appointment: { icon: <Calendar size={16} />, label: 'Appointments', color: '#22C55E' },
+    prescription: { icon: <Pill size={16} />, label: 'Prescriptions', color: '#F97316' },
+    test_results: { icon: <FlaskConical size={16} />, label: 'Test Results', color: '#14B8A6' },
+    admin: { icon: <ClipboardList size={16} />, label: 'Admin', color: '#8B5CF6' },
+    escalation: { icon: <ShieldAlert size={16} />, label: 'Escalation', color: '#EF4444' },
 };
 
 const URG: Record<string, string> = { EMERGENCY: '#EF4444', URGENT: '#F59E0B', SOON: '#3B82F6', ROUTINE: '#22C55E' };
@@ -64,7 +64,7 @@ export default function DemoPage() {
     const [showVoicePanel, setShowVoicePanel] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const endRef = useRef<HTMLDivElement>(null);
-    const inputRef = useRef<HTMLInputElement>(null);
+    const inputRef = useRef<HTMLTextAreaElement>(null);
 
     const voice = useVoice();
 
@@ -134,62 +134,119 @@ export default function DemoPage() {
     const ag = AGENTS[meta?.agent || 'orchestrator'];
 
     return (
-        <>
-            <TopNav />
-            <div style={{ display: 'flex', height: 'calc(100vh - 56px)', position: 'relative' }}>
-                {/* ═══ Chat Main ═══ */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)', minWidth: 0 }}>
-                    {/* Header */}
-                    <div style={{ padding: '10px 20px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{
-                            width: 40, height: 40, borderRadius: '12px', overflow: 'hidden',
-                            background: voice.isSpeaking ? 'linear-gradient(135deg,#2563EB,#7C3AED)' : 'var(--brand-blue)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            transition: 'all 0.3s',
-                            boxShadow: voice.isSpeaking ? '0 0 20px rgba(37,99,235,0.4)' : 'none'
-                        }}>
-                            {voice.isSpeaking ? (
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                    <rect x="3" y="8" width="3" height="8" rx="1" fill="white"><animate attributeName="height" values="8;16;8" dur="0.6s" repeatCount="indefinite" /><animate attributeName="y" values="8;4;8" dur="0.6s" repeatCount="indefinite" /></rect>
-                                    <rect x="8" y="5" width="3" height="14" rx="1" fill="white"><animate attributeName="height" values="14;6;14" dur="0.5s" repeatCount="indefinite" /><animate attributeName="y" values="5;9;5" dur="0.5s" repeatCount="indefinite" /></rect>
-                                    <rect x="13" y="7" width="3" height="10" rx="1" fill="white"><animate attributeName="height" values="10;18;10" dur="0.7s" repeatCount="indefinite" /><animate attributeName="y" values="7;3;7" dur="0.7s" repeatCount="indefinite" /></rect>
-                                    <rect x="18" y="9" width="3" height="6" rx="1" fill="white"><animate attributeName="height" values="6;12;6" dur="0.4s" repeatCount="indefinite" /><animate attributeName="y" values="9;6;9" dur="0.4s" repeatCount="indefinite" /></rect>
-                                </svg>
-                            ) : <EmmaLogo size={24} showText={false} />}
+        <main className="zyricon-chat-layout" style={{ display: 'flex', height: '100%', position: 'relative', width: '100%', overflow: 'hidden' }}>
+            {/* ═══ Chat Main ═══ */}
+            <div className="z-chat-container">
+                {/* Top Right Header (Zyricon style config dropdown area) */}
+                <div style={{ padding: '24px 32px 0', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.05)', borderRadius: '20px', fontSize: '0.8125rem', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                        <span>EMMA Core v4.0</span>
+                        <ChevronDown size={14} />
+                    </div>
+                    <button className="zs-card-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Right Panel {!sidebarOpen && <ChevronLeft size={14} />}</div>
+                    </button>
+                    <button className="zs-card-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={reset}>
+                        <RefreshCw size={14} /> Reset
+                    </button>
+                </div>
+
+                {/* Messages */}
+                <div className="z-chat-messages">
+                    {messages.length === 1 ? (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '24px', animation: 'fadeIn 0.5s' }}>
+                            <div style={{ transform: 'scale(1.5)', opacity: 0.9 }}>
+                                <EmmaLogo size={64} showText={false} />
+                            </div>
+                            <h2 style={{ fontSize: '1.75rem', fontWeight: 500, letterSpacing: '-0.02em', color: 'white' }}>
+                                How can I help you today?
+                            </h2>
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-primary)' }}>EMMA — AI GP Receptionist</div>
-                            <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                Riverside Medical Centre •{' '}
-                                {voice.isSpeaking && <span style={{ color: '#3B82F6', fontWeight: 600 }}>🔊 Speaking...</span>}
-                                {voice.isListening && <span style={{ color: '#EF4444', fontWeight: 600 }}>🎙 Listening...</span>}
-                                {loading && <span style={{ color: '#F59E0B', fontWeight: 600 }}>⏳ Thinking...</span>}
-                                {!voice.isSpeaking && !voice.isListening && !loading && <span style={{ color: '#22C55E' }}>● Online</span>}
+                    ) : (
+                        messages.map(m => (
+                            <div key={m.id} className={`chat-msg ${m.role}`}>
+                                <div className="chat-avatar">
+                                    {m.role === 'assistant' ? <EmmaLogo size={20} showText={false} /> : <div style={{ background: 'var(--bg-glass)', borderRadius: '50%', padding: '2px' }}><User size={16} /></div>}
+                                </div>
+                                <div className="chat-bubble">
+                                    {m.role === 'assistant' && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                                            <span style={{ fontSize: '0.625rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>EMMA</span>
+                                            {m.metadata?.agent && <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.5625rem', fontWeight: 700, background: AGENTS[m.metadata.agent]?.color || 'var(--brand-purple)', color: '#fff' }}>{AGENTS[m.metadata.agent]?.label}</span>}
+                                            {voice.voiceEnabled && (
+                                                <button onClick={() => voice.speak(m.content)} title="Replay" style={{ border: 'none', background: 'none', cursor: 'pointer', opacity: 0.4, padding: '0 2px', display: 'flex', alignItems: 'center' }}><Volume2 size={12} /></button>
+                                            )}
+                                        </div>
+                                    )}
+                                    {m.content.split('\n').map((line, i) => <span key={i}>{line}{i < m.content.split('\n').length - 1 && <br />}</span>)}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                    {loading && (
+                        <div className="chat-msg assistant">
+                            <div className="chat-avatar"><EmmaLogo size={20} showText={false} /></div>
+                            <div className="chat-bubble" style={{ display: 'flex', gap: '6px', alignItems: 'center', padding: '16px 24px' }}>
+                                <span className="typing-dot" />
+                                <span className="typing-dot" style={{ animationDelay: '0.2s' }} />
+                                <span className="typing-dot" style={{ animationDelay: '0.4s' }} />
                             </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                            <button onClick={voice.toggleVoice} title={voice.voiceEnabled ? 'Mute EMMA' : 'Unmute EMMA'}
-                                style={{ padding: '6px 10px', border: '1px solid var(--border-medium)', borderRadius: '8px', background: voice.voiceEnabled ? 'rgba(37,99,235,0.15)' : 'var(--bg-glass)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 500, color: voice.voiceEnabled ? '#93C5FD' : 'var(--text-muted)', transition: 'all 0.2s' }}>
-                                {voice.voiceEnabled ? '🔊' : '🔇'}
-                            </button>
-                            <button onClick={() => setShowVoicePanel(!showVoicePanel)} title="Voice Settings"
-                                style={{ padding: '6px 10px', border: '1px solid var(--border-medium)', borderRadius: '8px', background: showVoicePanel ? 'rgba(37,99,235,0.15)' : 'var(--bg-glass)', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                ⚙
-                            </button>
-                            <button onClick={() => setSidebarOpen(!sidebarOpen)} title="Toggle Sidebar"
-                                style={{ padding: '6px 10px', border: '1px solid var(--border-medium)', borderRadius: '8px', background: 'var(--bg-glass)', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                {sidebarOpen ? '◀' : '▶'}
-                            </button>
-                            <button className="btn btn-sm" onClick={reset}>🔄 New Call</button>
+                    )}
+
+                    {/* Voice listening indicator */}
+                    {voice.isListening && (
+                        <div style={{ alignSelf: 'center', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '20px', fontSize: '0.8125rem', color: '#EF4444', animation: 'fadeIn 0.3s' }}>
+                            <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+                                {[...Array(5)].map((_, i) => (
+                                    <div key={i} style={{ width: '3px', borderRadius: '2px', background: '#EF4444', animation: `voiceBar 0.${4 + i}s ease-in-out infinite alternate` }} />
+                                ))}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500 }}><Mic size={14} /> Speak now, EMMA is listening...</div>
+                            {voice.transcript && <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', marginLeft: '6px' }}>{voice.transcript}</span>}
+                        </div>
+                    )}
+                    <div ref={endRef} />
+                </div>
+
+                {/* Zyricon Floating Input */}
+                <div className="z-chat-input-wrapper">
+                    <div className="z-chat-input-box">
+                        <textarea
+                            ref={inputRef}
+                            className="z-input-textarea"
+                            placeholder={voice.isListening ? "Listening..." : "Ask EMMA anything..."}
+                            value={input}
+                            onChange={e => setInput(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    send(input);
+                                }
+                            }}
+                        />
+                        <div className="z-input-actions">
+                            <div className="z-action-left">
+                                <button className="z-action-btn" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Paperclip size={14} /> Attach</button>
+                                <button className="z-action-btn" style={{ display: 'flex', alignItems: 'center', gap: '4px' }} onClick={() => setShowVoicePanel(!showVoicePanel)}><Settings size={14} /> Settings</button>
+                            </div>
+                            <div className="z-action-right">
+                                <button className={`z-circle-btn mic ${voice.isListening ? 'recording' : ''}`} onClick={handleMicClick}>
+                                    🎙
+                                </button>
+                                <button className="z-circle-btn send" onClick={() => send(input)} disabled={!input.trim() || loading}>
+                                    ↑
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Voice Settings Panel */}
+                    {/* Expandable Voice Settings inline panel (if activated) */}
                     {showVoicePanel && (
-                        <div style={{ padding: '12px 20px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'center', fontSize: '0.75rem' }}>
+                        <div style={{ width: '100%', maxWidth: '800px', marginTop: '12px', padding: '16px', background: 'rgba(22, 18, 30, 0.4)', backdropFilter: 'blur(20px)', borderRadius: '20px', border: '1px solid var(--border-subtle)', display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'center', fontSize: '0.75rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <label style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Voice:</label>
-                                <select style={{ padding: '4px 8px', border: '1px solid var(--border-medium)', borderRadius: '6px', fontSize: '0.6875rem', maxWidth: '180px', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                                <select style={{ padding: '4px 8px', border: '1px solid var(--border-medium)', borderRadius: '6px', background: 'var(--bg-input)', color: 'white' }}
                                     value={voice.selectedVoice?.name || ''}
                                     onChange={e => { const v = voice.availableVoices.find(x => x.name === e.target.value); if (v) voice.setVoice(v); }}>
                                     {voice.availableVoices.filter(v => v.lang.startsWith('en')).map(v => (
@@ -200,177 +257,117 @@ export default function DemoPage() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <label style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Speed:</label>
                                 <input type="range" min="0.5" max="1.5" step="0.05" value={voice.rate}
-                                    onChange={e => voice.setRate(parseFloat(e.target.value))}
-                                    style={{ width: '80px' }} />
-                                <span style={{ color: 'var(--text-muted)', width: '30px' }}>{voice.rate.toFixed(2)}x</span>
+                                    onChange={e => voice.setRate(parseFloat(e.target.value))} />
+                                <span style={{ color: 'var(--text-muted)' }}>{voice.rate.toFixed(2)}x</span>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <label style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Auto-speak:</label>
-                                <button onClick={voice.toggleAutoSpeak}
-                                    className={`toggle ${voice.autoSpeak ? 'active' : ''}`}
-                                    style={{ width: '36px', height: '20px' }} />
+                                <button onClick={voice.toggleAutoSpeak} className={`toggle ${voice.autoSpeak ? 'active' : ''}`} style={{ width: '36px', height: '20px' }} />
                             </div>
-                            {voice.error && <div style={{ color: '#EF4444', fontWeight: 500 }}>⚠ {voice.error}</div>}
+                            {voice.error && <div style={{ color: '#EF4444', display: 'flex', alignItems: 'center', gap: '6px' }}><AlertTriangle size={14} /> {voice.error}</div>}
                         </div>
                     )}
 
-                    {/* Messages */}
-                    <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {messages.map(m => (
-                            <div key={m.id} className={`chat-msg ${m.role === 'assistant' ? 'emma' : 'patient'}`}>
-                                {m.role === 'assistant' && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                                        <span style={{ fontSize: '0.625rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>EMMA</span>
-                                        {m.metadata?.agent && <span style={{ padding: '1px 8px', borderRadius: '4px', fontSize: '0.5625rem', fontWeight: 700, background: AGENTS[m.metadata.agent]?.color || '#7C3AED', color: '#fff' }}>{AGENTS[m.metadata.agent]?.label}</span>}
-                                        {voice.voiceEnabled && (
-                                            <button onClick={() => voice.speak(m.content)} title="Replay" style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.75rem', opacity: 0.4, padding: '0 2px' }}>🔊</button>
-                                        )}
-                                    </div>
-                                )}
-                                {m.role === 'user' && <div style={{ fontSize: '0.625rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.7, marginBottom: '4px' }}>You</div>}
-                                {m.content.split('\n').map((line, i) => <span key={i}>{line}{i < m.content.split('\n').length - 1 && <br />}</span>)}
-                            </div>
-                        ))}
-                        {loading && <div className="typing-dots"><span /><span /><span /></div>}
-
-                        {/* Voice listening indicator */}
-                        {voice.isListening && (
-                            <div style={{ alignSelf: 'flex-end', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '12px', fontSize: '0.8125rem', color: '#EF4444', animation: 'fadeIn 0.3s' }}>
-                                <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
-                                    {[...Array(5)].map((_, i) => (
-                                        <div key={i} style={{ width: '3px', borderRadius: '2px', background: '#EF4444', animation: `voiceBar 0.${4 + i}s ease-in-out infinite alternate` }} />
-                                    ))}
+                    {/* Suggestion Cards */}
+                    {messages.length === 1 && (
+                        <div className="z-scenarios">
+                            {SCENARIOS.slice(0, 4).map((s, i) => (
+                                <div key={i} className="z-scenario-card" onClick={() => { setInput(s.msg); send(s.msg); }}>
+                                    <div className="z-scenario-icon">{s.icon}</div>
+                                    <div className="z-scenario-title">{s.label}</div>
+                                    <div className="z-scenario-desc">{s.msg}</div>
                                 </div>
-                                <span style={{ fontWeight: 500 }}>🎙 Listening...</span>
-                                {voice.transcript && <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>{voice.transcript}</span>}
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* ═══ Sidebar ═══ */}
+            {sidebarOpen && (
+                <div style={{ width: '340px', background: 'rgba(22, 18, 30, 0.6)', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)', borderLeft: '1px solid var(--border-subtle)', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto', transition: 'all 0.3s', zIndex: 10 }}>
+                    {/* Active Agent */}
+                    <div className="cs-section">
+                        <h4 style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Active Agent</h4>
+                        <div className="cs-agent-box" style={{ borderColor: ag.color, background: 'var(--bg-card)' }}>
+                            <span className="csab-icon">{ag.icon}</span>
+                            <div>
+                                <div className="csab-name" style={{ color: ag.color }}>{ag.label}</div>
+                                <div className="csab-desc" style={{ color: 'var(--text-muted)' }}>{meta?.agent === 'triage' ? 'Assessing symptoms' : meta?.agent === 'appointment' ? 'Managing appointments' : meta?.agent === 'prescription' ? 'Processing Rx' : meta?.agent === 'test_results' ? 'Retrieving results' : meta?.agent === 'admin' ? 'Practice queries' : meta?.agent === 'escalation' ? 'Emergency handling' : 'Ready to route'}</div>
                             </div>
-                        )}
-                        <div ref={endRef} />
+                        </div>
                     </div>
 
-                    {/* Scenarios */}
-                    <div className="chat-scenarios">
-                        {SCENARIOS.map((s, i) => (
-                            <button key={i} className="scenario-pill" onClick={() => send(s.msg)} disabled={loading}>{s.icon} {s.label}</button>
-                        ))}
+                    {/* Voice Status */}
+                    <div className="cs-section" style={{ background: voice.isSpeaking ? 'rgba(37,99,235,0.06)' : voice.isListening ? 'rgba(239,68,68,0.06)' : 'var(--bg-glass)', borderRadius: '16px', padding: '16px' }}>
+                        <h4 style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Voice Status</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8125rem' }}>
+                            <div className="cs-row" style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>TTS (EMMA)</span><span style={{ color: voice.voiceEnabled ? '#22C55E' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>{voice.voiceEnabled ? <><Volume2 size={12} /> ON</> : <><Volume2 size={12} opacity={0.5} /> OFF</>}</span></div>
+                            <div className="cs-row" style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>STT (Mic)</span><span style={{ color: voice.isListening ? '#EF4444' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>{voice.isListening ? <><Mic size={12} /> LIVE</> : <><Mic size={12} opacity={0.5} /> Ready</>}</span></div>
+                            <div className="cs-row" style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Auto-Speak</span><span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>{voice.autoSpeak ? <><CheckCircle2 size={12} color="#22C55E" /> ON</> : <><X size={12} /> OFF</>}</span></div>
+                            {voice.selectedVoice && <div className="cs-row" style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Voice</span><span style={{ color: 'var(--text-secondary)', fontSize: '0.6875rem' }}>{voice.selectedVoice.name.split(' ').slice(0, 2).join(' ')}</span></div>}
+                        </div>
                     </div>
 
-                    {/* Input */}
-                    <div style={{ padding: '12px 20px', background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-subtle)', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <button onClick={handleMicClick} disabled={loading}
-                            title={voice.isListening ? 'Stop listening' : 'Start speaking'}
-                            style={{
-                                width: 44, height: 44, borderRadius: '50%', border: 'none', cursor: 'pointer',
-                                background: voice.isListening ? '#EF4444' : 'var(--bg-glass-hover)',
-                                color: voice.isListening ? '#fff' : 'var(--text-muted)',
-                                fontSize: '1.125rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                transition: 'all 0.2s',
-                                boxShadow: voice.isListening ? '0 0 20px rgba(239,68,68,0.3)' : 'none',
-                                animation: voice.isListening ? 'micPulse 2s infinite' : 'none',
-                                flexShrink: 0,
-                            }}>
-                            🎙
-                        </button>
-                        <input ref={inputRef} className="chat-input" placeholder={voice.isListening ? '🎙 Speak now — EMMA is listening...' : 'Type your message as a patient calling the GP...'}
-                            value={input} onChange={e => setInput(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); send(input); } }}
-                            disabled={loading}
-                            style={{ flex: 1 }} />
-                        <button className="btn btn-primary" onClick={() => send(input)} disabled={loading || !input.trim()}
-                            style={{ height: 44, paddingLeft: 20, paddingRight: 20, flexShrink: 0 }}>
-                            Send
-                        </button>
+                    {/* Classification */}
+                    <div className="cs-section">
+                        <h4 style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Classification</h4>
+                        <div className="cs-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}><span style={{ color: 'var(--text-secondary)' }}>Intent</span><span><span className="badge badge-standard">{meta?.intent || 'Listening...'}</span></span></div>
+                        <div className="cs-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}><span style={{ color: 'var(--text-secondary)' }}>Urgency</span>{meta?.urgency ? <span className="badge" style={{ background: `${URG[meta.urgency]}22`, color: URG[meta.urgency] }}>{meta.urgency}</span> : <span style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>—</span>}</div>
+                        <div className="cs-row" style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Patient</span><span style={{ color: meta?.patientVerified ? '#22C55E' : 'var(--text-muted)', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '4px' }}>{meta?.patientVerified ? <><CheckCircle2 size={14} /> Verified</> : <><Clock size={14} /> Not verified</>}</span></div>
+                    </div>
+
+                    {/* Red Flags */}
+                    {rfs.length > 0 && (
+                        <div className="cs-section">
+                            <h4 style={{ fontSize: '0.8125rem', color: '#EF4444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}><ShieldAlert size={14} /> Red Flags</h4>
+                            {rfs.map((f, i) => <div key={i} style={{ padding: '8px 12px', background: 'rgba(239,68,68,0.1)', color: '#EF4444', borderRadius: '8px', fontSize: '0.8125rem', marginBottom: '6px', display: 'flex', gap: '6px', alignItems: 'flex-start' }}><AlertTriangle size={14} style={{ flexShrink: 0, marginTop: '2px' }} /> <span>{f}</span></div>)}
+                        </div>
+                    )}
+
+                    {/* SNOMED */}
+                    <div className="cs-section">
+                        <h4 style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>SNOMED CT Codes</h4>
+                        {syms.length > 0 ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                {syms.map((s, i) => <span key={i} className={`snomed-chip ${s.isRedFlag ? 'flagged' : ''}`}>{s.display} <span className="sc-code">{s.code}</span></span>)}
+                            </div>
+                        ) : <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No codes extracted</div>}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="cs-section">
+                        <h4 style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Actions Performed</h4>
+                        {acts.length > 0 ? acts.map((a, i) => {
+                            const IconCmp = a.type === 'appointment_booked' || a.type === 'slots_offered' ? Calendar : a.type === 'prescription_submitted' ? Pill : a.type === 'patient_verified' ? CheckCircle2 : a.type === 'results_delivered' || a.type === 'results_pending' ? FlaskConical : a.type === 'gp_callback_arranged' ? PhoneCall : a.type === 'info_provided' ? ClipboardList : a.type === 'emergency_999' ? ShieldAlert : a.type === 'human_transfer' ? User : CheckCircle2;
+                            return (
+                                <div key={i} style={{ fontSize: '0.75rem', padding: '10px', display: 'flex', gap: '8px', background: 'var(--bg-glass)', border: '1px solid var(--border-subtle)', borderRadius: '12px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                                    <IconCmp size={14} style={{ marginTop: '2px', flexShrink: 0 }} />
+                                    <span style={{ lineHeight: 1.4 }}>{a.description}</span>
+                                </div>
+                            );
+                        }) : <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Waiting for actions...</div>}
+                    </div>
+
+                    {/* Agent List */}
+                    <div className="cs-section">
+                        <h4 style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Agent Pipeline</h4>
+                        <div className="cs-agent-list">
+                            {Object.entries(AGENTS).map(([k, v]) => (
+                                <div key={k} className={`csa-item ${meta?.agent === k ? 'active' : ''}`}>
+                                    <span>{v.icon}</span> {v.label}
+                                    {meta?.agent === k && <span className="csa-badge" style={{ background: v.color, color: '#fff' }}>ACTIVE</span>}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="cs-section" style={{ borderBottom: 'none', fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: 'auto', paddingTop: '24px' }}>
+                        <div>Call ID: {convState?.callId?.slice(0, 8) || '—'}</div>
+                        <div>Messages: {messages.length} • Codes: {syms.length}</div>
                     </div>
                 </div>
-
-                {/* ═══ Sidebar ═══ */}
-                {sidebarOpen && (
-                    <div className="chat-sidebar" style={{ transition: 'all 0.3s' }}>
-                        {/* Active Agent */}
-                        <div className="cs-section">
-                            <h4>Active Agent</h4>
-                            <div className="cs-agent-box" style={{ borderColor: ag.color }}>
-                                <span className="csab-icon">{ag.icon}</span>
-                                <div>
-                                    <div className="csab-name" style={{ color: ag.color }}>{ag.label}</div>
-                                    <div className="csab-desc">{meta?.agent === 'triage' ? 'Assessing symptoms' : meta?.agent === 'appointment' ? 'Managing appointments' : meta?.agent === 'prescription' ? 'Processing Rx' : meta?.agent === 'test_results' ? 'Retrieving results' : meta?.agent === 'admin' ? 'Practice queries' : meta?.agent === 'escalation' ? 'Emergency handling' : 'Ready to route'}</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Voice Status */}
-                        <div className="cs-section" style={{ background: voice.isSpeaking ? 'rgba(37,99,235,0.06)' : voice.isListening ? 'rgba(239,68,68,0.06)' : 'transparent' }}>
-                            <h4>Voice Status</h4>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8125rem' }}>
-                                <div className="cs-row"><span className="csr-label">TTS (EMMA Speaks)</span><span className="csr-value" style={{ color: voice.voiceEnabled ? '#22C55E' : 'var(--text-muted)' }}>{voice.voiceEnabled ? '🔊 ON' : '🔇 OFF'}</span></div>
-                                <div className="cs-row"><span className="csr-label">STT (Mic Input)</span><span className="csr-value" style={{ color: voice.isListening ? '#EF4444' : 'var(--text-muted)' }}>{voice.isListening ? '🎙 LIVE' : '⏹ Ready'}</span></div>
-                                <div className="cs-row"><span className="csr-label">Auto-Speak</span><span className="csr-value">{voice.autoSpeak ? '✅ ON' : '❌ OFF'}</span></div>
-                                {voice.selectedVoice && <div className="cs-row"><span className="csr-label">Voice</span><span className="csr-value" style={{ fontSize: '0.6875rem' }}>{voice.selectedVoice.name.split(' ').slice(0, 2).join(' ')}</span></div>}
-                            </div>
-                        </div>
-
-                        {/* Classification */}
-                        <div className="cs-section">
-                            <h4>Classification</h4>
-                            <div className="cs-row"><span className="csr-label">Intent</span><span className="csr-value"><span className="badge badge-standard">{meta?.intent || 'Listening...'}</span></span></div>
-                            <div className="cs-row"><span className="csr-label">Urgency</span>{meta?.urgency ? <span className="badge" style={{ background: `${URG[meta.urgency]}22`, color: URG[meta.urgency] }}>{meta.urgency === 'EMERGENCY' ? '🚨 ' : ''}{meta.urgency}</span> : <span style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>—</span>}</div>
-                            <div className="cs-row"><span className="csr-label">Patient</span><span className="csr-value" style={{ color: meta?.patientVerified ? '#22C55E' : 'var(--text-muted)', fontSize: '0.8125rem' }}>{meta?.patientVerified ? `✅ ${convState?.patientName || 'Verified'}` : '⏳ Not verified'}</span></div>
-                        </div>
-
-                        {/* Red Flags */}
-                        {rfs.length > 0 && (
-                            <div className="cs-section cs-redflag-section">
-                                <h4>🚨 Red Flags</h4>
-                                {rfs.map((f, i) => <div key={i} className="cs-rf-item">⚠️ {f}</div>)}
-                            </div>
-                        )}
-
-                        {/* SNOMED */}
-                        <div className="cs-section">
-                            <h4>SNOMED CT Codes</h4>
-                            {syms.length > 0 ? (
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                    {syms.map((s, i) => <span key={i} className={`snomed-chip ${s.isRedFlag ? 'flagged' : ''}`}>{s.display} <span className="sc-code">{s.code}</span></span>)}
-                                </div>
-                            ) : <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No codes extracted</div>}
-                        </div>
-
-                        {/* Actions */}
-                        <div className="cs-section">
-                            <h4>Actions Performed</h4>
-                            {acts.length > 0 ? acts.map((a, i) => {
-                                const icon = a.type === 'appointment_booked' ? '📅' : a.type === 'slots_offered' ? '🗓️' : a.type === 'prescription_submitted' ? '💊' : a.type === 'patient_verified' ? '✅' : a.type === 'results_delivered' ? '🔬' : a.type === 'gp_callback_arranged' ? '📞' : a.type === 'results_pending' ? '⏳' : a.type === 'info_provided' ? '📋' : a.type === 'emergency_999' ? '🚨' : a.type === 'human_transfer' ? '👤' : '✓';
-                                const bg = a.type.includes('emergency') || a.type.includes('999') ? 'rgba(239,68,68,0.08)' : a.type.includes('appointment') || a.type.includes('slot') ? 'rgba(34,197,94,0.08)' : a.type.includes('prescription') ? 'rgba(249,115,22,0.08)' : a.type.includes('result') ? 'rgba(59,130,246,0.08)' : a.type.includes('verified') ? 'rgba(34,197,94,0.08)' : a.type.includes('transfer') ? 'rgba(239,68,68,0.08)' : 'var(--bg-glass)';
-                                const border = a.type.includes('emergency') || a.type.includes('999') ? 'rgba(239,68,68,0.2)' : a.type.includes('appointment') || a.type.includes('slot') ? 'rgba(34,197,94,0.2)' : a.type.includes('prescription') ? 'rgba(249,115,22,0.2)' : a.type.includes('result') ? 'rgba(59,130,246,0.2)' : a.type.includes('verified') ? 'rgba(34,197,94,0.2)' : a.type.includes('transfer') ? 'rgba(239,68,68,0.2)' : 'var(--border-subtle)';
-                                return (
-                                    <div key={i} style={{ fontSize: '0.75rem', padding: '8px 10px', display: 'flex', alignItems: 'flex-start', gap: '8px', background: bg, border: `1px solid ${border}`, borderRadius: '8px', marginBottom: '6px', color: 'var(--text-secondary)' }}>
-                                        <span style={{ fontSize: '0.875rem', lineHeight: 1 }}>{icon}</span>
-                                        <span style={{ lineHeight: 1.4 }}>{a.description}</span>
-                                    </div>
-                                );
-                            }) : <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No actions yet — EMMA is listening</div>}
-                        </div>
-
-                        {/* Agent List */}
-                        <div className="cs-section">
-                            <h4>Agent Pipeline</h4>
-                            <div className="cs-agent-list">
-                                {Object.entries(AGENTS).map(([k, v]) => (
-                                    <div key={k} className={`csa-item ${meta?.agent === k ? 'active' : ''}`}>
-                                        <span>{v.icon}</span> {v.label}
-                                        {meta?.agent === k && <span className="csa-badge" style={{ background: v.color, color: '#fff' }}>ACTIVE</span>}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="cs-section" style={{ borderBottom: 'none', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
-                            <div>Call ID: {convState?.callId?.slice(0, 8) || '—'}</div>
-                            <div>Messages: {messages.length} • Codes: {syms.length}</div>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </>
+            )}
+        </main>
     );
 }

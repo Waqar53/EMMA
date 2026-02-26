@@ -213,3 +213,293 @@ export interface AgentResponse {
   metadata: MessageMetadata;
   state: ConversationState;
 }
+
+// ═══════════════════════════════════════════════════════════
+// SUPERPOWER ENGINE TYPES
+// ═══════════════════════════════════════════════════════════
+
+// SP1 — Autonomous Multi-Step Execution
+export type ToolStatus = 'pending' | 'running' | 'success' | 'failed' | 'rolled_back';
+
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  category: 'patient' | 'appointment' | 'clinical' | 'communication' | 'admin' | 'document';
+  parameters: { name: string; type: string; required: boolean; description: string }[];
+  requiresPatientVerification: boolean;
+}
+
+export interface ExecutionStep {
+  id: string;
+  stepNumber: number;
+  toolName: string;
+  parameters: Record<string, unknown>;
+  status: ToolStatus;
+  result?: unknown;
+  error?: string;
+  startedAt: string;
+  completedAt?: string;
+  durationMs?: number;
+  reasoning: string;
+}
+
+export interface ExecutionTrace {
+  id: string;
+  callId: string;
+  patientNHSNumber?: string;
+  triggerMessage: string;
+  plan: string[];
+  steps: ExecutionStep[];
+  status: 'planning' | 'executing' | 'completed' | 'failed' | 'rolled_back';
+  totalSteps: number;
+  completedSteps: number;
+  startedAt: string;
+  completedAt?: string;
+  totalDurationMs?: number;
+}
+
+// SP2 — Computer & Browser Use
+export type BrowserActionType = 'navigate' | 'click' | 'type' | 'screenshot' | 'extract' | 'submit_form' | 'wait' | 'scroll' | 'select';
+
+export interface BrowserAction {
+  id: string;
+  actionType: BrowserActionType;
+  target?: string;
+  value?: string;
+  screenshotRef?: string;
+  reasoning: string;
+  timestamp: string;
+  success: boolean;
+}
+
+export interface BrowserSession {
+  id: string;
+  taskDescription: string;
+  targetUrl: string;
+  domain: string;
+  status: 'active' | 'completed' | 'failed' | 'timeout' | 'blocked';
+  actions: BrowserAction[];
+  startedAt: string;
+  completedAt?: string;
+  securityFlags: string[];
+  auditTrail: string[];
+}
+
+// SP3 — Long-Horizon Memory
+export type MemoryLayer = 'working' | 'episodic' | 'semantic' | 'procedural';
+export type FactCategory = 'preference' | 'medical_history' | 'social' | 'behavioural' | 'emotional' | 'administrative';
+
+export interface MemoryFact {
+  id: string;
+  patientNHSNumber: string;
+  layer: MemoryLayer;
+  category: FactCategory;
+  fact: string;
+  confidence: number;
+  source: string;
+  extractedAt: string;
+  lastAccessedAt: string;
+  accessCount: number;
+  expiresAt?: string;
+}
+
+export interface PatientMemory {
+  patientNHSNumber: string;
+  patientName: string;
+  facts: MemoryFact[];
+  workingContext: string[];
+  totalInteractions: number;
+  firstInteractionAt: string;
+  lastInteractionAt: string;
+}
+
+// SP4 — Self-Improvement Engine
+export type PromptStatus = 'draft' | 'testing' | 'deployed' | 'rolled_back' | 'archived';
+
+export interface PromptVersion {
+  id: string;
+  version: string;
+  agentType: AgentType;
+  promptText: string;
+  status: PromptStatus;
+  performanceScore: number;
+  safetyScore: number;
+  resolutionRate: number;
+  patientSatisfaction: number;
+  testCasesPassed: number;
+  testCasesTotal: number;
+  redFlagCatchRate: number;
+  createdAt: string;
+  deployedAt?: string;
+  rolledBackAt?: string;
+  rolledBackReason?: string;
+}
+
+export interface ABTestResult {
+  id: string;
+  controlVersionId: string;
+  experimentVersionId: string;
+  metric: string;
+  controlValue: number;
+  experimentValue: number;
+  improvement: number;
+  statisticalSignificance: number;
+  sampleSize: number;
+  startedAt: string;
+  completedAt?: string;
+  decision: 'deploy' | 'rollback' | 'continue' | 'inconclusive';
+}
+
+// SP5 — Proactive Patient Outreach
+export type OutreachType = 'annual_review' | 'medication_expiry' | 'health_check' | 'post_discharge' | 'cervical_screening' | 'vaccination' | 'follow_up';
+export type OutreachStatus = 'identified' | 'queued' | 'gp_approved' | 'sent' | 'delivered' | 'responded' | 'booked' | 'opted_out' | 'failed';
+
+export interface OutreachCampaign {
+  id: string;
+  type: OutreachType;
+  name: string;
+  description: string;
+  targetCount: number;
+  sentCount: number;
+  respondedCount: number;
+  bookedCount: number;
+  createdAt: string;
+  status: 'draft' | 'active' | 'paused' | 'completed';
+}
+
+export interface OutreachContact {
+  id: string;
+  campaignId: string;
+  patientNHSNumber: string;
+  patientName: string;
+  outreachType: OutreachType;
+  reason: string;
+  status: OutreachStatus;
+  priority: number;
+  messageContent?: string;
+  sentAt?: string;
+  respondedAt?: string;
+  outcome?: string;
+}
+
+// SP6 — Autonomous Schedule Management
+export interface DNAPrediction {
+  patientNHSNumber: string;
+  patientName: string;
+  slotId: string;
+  slotTime: string;
+  dnaProbability: number;
+  riskFactors: { factor: string; weight: number }[];
+  recommendation: 'book' | 'double_book' | 'confirm_24h' | 'confirm_2h' | 'avoid';
+}
+
+export interface ScheduleOptimization {
+  id: string;
+  date: string;
+  totalSlots: number;
+  filledSlots: number;
+  optimizedSlots: number;
+  predictedDNAs: number;
+  gapsFilled: number;
+  avgFillTimeMinutes: number;
+  waitlistContacted: number;
+  optimizationScore: number;
+  actions: { type: string; description: string; timestamp: string; result: string }[];
+}
+
+// SP7 — Clinical Document Authoring
+export type DocumentType = 'referral_letter' | 'fit_note' | 'two_week_wait' | 'insurance_report' | 'care_plan' | 'discharge_summary';
+export type DocumentStatus = 'DRAFTING' | 'AWAITING_GP_REVIEW' | 'GP_APPROVED' | 'SENT' | 'REJECTED' | 'ARCHIVED';
+
+export interface ClinicalDocument {
+  id: string;
+  type: DocumentType;
+  patientNHSNumber: string;
+  patientName: string;
+  title: string;
+  content: string;
+  status: DocumentStatus;
+  gpApprovalRequired: true;
+  templateUsed: string;
+  snomedCodes: { code: string; display: string }[];
+  niceGuidelinesReferenced: string[];
+  createdAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  approvedAt?: string;
+  sentAt?: string;
+  version: number;
+  previousVersions: { version: number; content: string; editedAt: string; editedBy: string }[];
+}
+
+// SP8 — Health Data Monitoring
+export type HealthDataSource = 'fhir' | 'wearable' | 'lab_result' | 'nhs_111' | 'nhs_999' | 'discharge' | 'gp_entry' | 'patient_reported';
+export type AlertTier = 'CRITICAL' | 'URGENT' | 'MONITOR' | 'INFO';
+
+export interface HealthReading {
+  id: string;
+  patientNHSNumber: string;
+  source: HealthDataSource;
+  type: string;
+  value: number;
+  unit: string;
+  normalRangeLow?: number;
+  normalRangeHigh?: number;
+  timestamp: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface HealthAlert {
+  id: string;
+  patientNHSNumber: string;
+  patientName: string;
+  tier: AlertTier;
+  type: string;
+  description: string;
+  readings: HealthReading[];
+  context: string;
+  recommendedAction: string;
+  autoResponseTriggered: boolean;
+  acknowledgedAt?: string;
+  acknowledgedBy?: string;
+  createdAt: string;
+}
+
+// Master Graph
+export type GraphNodeStatus = 'pending' | 'active' | 'completed' | 'skipped' | 'error';
+
+export interface GraphNode {
+  id: string;
+  name: string;
+  engine: string;
+  status: GraphNodeStatus;
+  input?: unknown;
+  output?: unknown;
+  startedAt?: string;
+  completedAt?: string;
+  error?: string;
+}
+
+export interface MasterGraphState {
+  id: string;
+  callId: string;
+  nodes: GraphNode[];
+  currentNode: string;
+  checkpointData: Record<string, unknown>;
+  startedAt: string;
+  completedAt?: string;
+  status: 'running' | 'completed' | 'failed' | 'paused';
+}
+
+// Command Centre
+export interface CommandCentreData {
+  agentExecutor: { activeTraces: ExecutionTrace[]; totalExecutions: number; avgStepsPerTask: number; successRate: number };
+  browserAgent: { activeSessions: BrowserSession[]; totalSessions: number; successRate: number };
+  memory: { totalPatients: number; totalFacts: number; factsByLayer: Record<MemoryLayer, number>; recentFacts: MemoryFact[] };
+  selfImprove: { currentVersions: PromptVersion[]; activeTests: ABTestResult[]; totalImprovements: number; safetyGateStatus: 'passing' | 'failing' };
+  outreach: { activeCampaigns: OutreachCampaign[]; todayContacted: number; todayResponded: number; todayBooked: number };
+  schedule: { todayOptimization: ScheduleOptimization; predictedDNAs: DNAPrediction[]; gapsFilled: number };
+  documents: { pendingReview: ClinicalDocument[]; todayDrafted: number; todayApproved: number };
+  healthMonitor: { activeAlerts: HealthAlert[]; criticalCount: number; urgentCount: number; monitorCount: number; recentReadings: HealthReading[] };
+  masterGraph: { activeGraphs: MasterGraphState[]; totalProcessed: number; avgProcessingMs: number };
+}
