@@ -1,0 +1,38 @@
+{
+  "readings": [
+    {
+      "id": "33b7fdb8-66db-4ad2-8103-8e9a9e921583",
+      "patientNHSNumber": "193 482 9103",
+      "type": "blood_pressure_systolic",
+      "value": 180,
+      "unit": "mmHg",
+      "timestamp": "2026-02-26T21:44:00.930Z",
+      "source": "command_centre"
+    }
+  ],
+  "alerts": [
+    {
+      "id": "69e146a6-33e1-4f92-866d-1235103fac2c",
+      "patientNHSNumber": "193 482 9103",
+      "patientName": "Sarah Jenkins",
+      "tier": "CRITICAL",
+      "type": "blood_pressure_systolic",
+      "description": "Critically elevated systolic blood pressure, indicating a potential hypertensive emergency that may lead to organ damage if not promptly addressed",
+      "readings": [
+        {
+          "id": "33b7fdb8-66db-4ad2-8103-8e9a9e921583",
+          "patientNHSNumber": "193 482 9103",
+          "type": "blood_pressure_systolic",
+          "value": 180,
+          "unit": "mmHg",
+          "timestamp": "2026-02-26T21:44:00.930Z",
+          "source": "command_centre"
+        }
+      ],
+      "context": "Monitor for symptoms such as headache, chest pain, or shortness of breath; consider prompt referral to a specialist if necessary",
+      "recommendedAction": "Immediate medical attention is required; the patient should be contacted urgently to attend the GP practice or visit the emergency department",
+      "autoResponseTriggered": true,
+      "createdAt": "2026-02-26T21:44:01.833Z"
+    }
+  ]
+}

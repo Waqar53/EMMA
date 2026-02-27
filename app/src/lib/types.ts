@@ -433,7 +433,7 @@ export interface ClinicalDocument {
 }
 
 // SP8 — Health Data Monitoring
-export type HealthDataSource = 'fhir' | 'wearable' | 'lab_result' | 'nhs_111' | 'nhs_999' | 'discharge' | 'gp_entry' | 'patient_reported';
+export type HealthDataSource = 'fhir' | 'wearable' | 'lab_result' | 'nhs_111' | 'nhs_999' | 'discharge' | 'gp_entry' | 'patient_reported' | 'command_centre';
 export type AlertTier = 'CRITICAL' | 'URGENT' | 'MONITOR' | 'INFO';
 
 export interface HealthReading {

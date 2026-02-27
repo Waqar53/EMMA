@@ -3,7 +3,6 @@
 // Implements PRD §7 F4 identity verification + AGENT_INSTRUCTIONS §10
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { patients } from '../data/store';
 import { PatientRecord } from '../types';
 
 export interface VerificationResult {
@@ -24,7 +23,7 @@ export interface VerificationResult {
  * Per AGENT_INSTRUCTIONS §10: Max 3 verification attempts.
  * After 3 failures → escalate to human receptionist.
  */
-export function verifyPatientFromText(text: string, attempt: number = 1): VerificationResult {
+export function verifyPatientFromText(text: string, attempt: number = 1, patients: PatientRecord[] = []): VerificationResult {
     const lower = text.toLowerCase().replace(/[^\w\s\/\-\.]/g, '');
 
     for (const patient of patients) {

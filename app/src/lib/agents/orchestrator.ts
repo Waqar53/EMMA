@@ -5,8 +5,8 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { callLLM, LLMMessage } from '../llm/groq';
-import { ConversationState, AgentResponse, AgentType, IntentType, MessageMetadata } from '../types';
-import { practice, patients, appointments } from '../data/store';
+import { ConversationState, AgentResponse, AgentType, IntentType, MessageMetadata, PracticeConfig, PatientRecord, AppointmentSlot } from '../types';
+import { getPractice, getPatients, getAppointments, getTestResults as getTestResultsFromDB } from '../data/store';
 import { performClinicalAssessment, ClinicalAssessment, checkRedFlags, RED_FLAG_PROTOCOLS } from './safety';
 import { extractSNOMEDCodes, formatSNOMEDForDisplay } from './snomed';
 import { verifyPatientFromText, requiresVerification, getVerificationPrompt } from './verification';
@@ -139,7 +139,7 @@ function classifyIntent(message: string, conversationHistory: string[] = []): In
 // From AGENT_INSTRUCTIONS §2-§9
 // ═══════════════════════════════════════════════════════════
 
-function getMasterSystemPrompt(): string {
+function getMasterSystemPrompt(practice: PracticeConfig): string {
     return `You are EMMA, the AI receptionist for ${practice.name} GP surgery. You answer phone calls from patients and help them with their healthcare needs.
 
 YOUR IDENTITY:
@@ -209,8 +209,8 @@ RESPONSE FORMAT:
 - Always offer: "Is there anything else I can help with?" before closing`;
 }
 
-function getTriagePrompt(state: ConversationState, assessment?: ClinicalAssessment): string {
-    return `${getMasterSystemPrompt()}
+function getTriagePrompt(state: ConversationState, practice: PracticeConfig, assessment?: ClinicalAssessment): string {
+    return `${getMasterSystemPrompt(practice)}
 
 ═══ CURRENT MODE: CLINICAL TRIAGE ═══
 
@@ -257,9 +257,9 @@ NEVER say "you have [condition]". Say "based on what you've described, I'd like 
 ${state.patientVerified ? `Patient verified: ${state.patientName}` : 'Patient NOT yet verified — verify before proceeding with booking.'}`;
 }
 
-function getAppointmentPrompt(state: ConversationState): string {
+function getAppointmentPrompt(state: ConversationState, practice: PracticeConfig, appointments: AppointmentSlot[]): string {
     const availableSlots = appointments.filter(s => s.available);
-    return `${getMasterSystemPrompt()}
+    return `${getMasterSystemPrompt(practice)}
 
 ═══ CURRENT MODE: APPOINTMENT MANAGEMENT ═══
 
@@ -290,12 +290,12 @@ If no suitable slots are available:
 ${state.patientVerified ? `Patient verified: ${state.patientName}` : 'You need to verify the patient first. Ask for their full name and date of birth.'}`;
 }
 
-function getPrescriptionPrompt(state: ConversationState): string {
+function getPrescriptionPrompt(state: ConversationState, practice: PracticeConfig, patients: PatientRecord[]): string {
     const patientMeds = state.patientNHSNumber
         ? patients.find(p => p.nhsNumber === state.patientNHSNumber)?.medications || []
         : [];
 
-    return `${getMasterSystemPrompt()}
+    return `${getMasterSystemPrompt(practice)}
 
 ═══ CURRENT MODE: REPEAT PRESCRIPTION ═══
 
@@ -322,8 +322,8 @@ CRITICAL RULES:
 - If they mention allergic reactions → Treat as urgent, route to clinical triage`;
 }
 
-function getTestResultsPrompt(state: ConversationState): string {
-    return `${getMasterSystemPrompt()}
+function getTestResultsPrompt(state: ConversationState, practice: PracticeConfig): string {
+    return `${getMasterSystemPrompt(practice)}
 
 ═══ CURRENT MODE: TEST RESULTS ═══
 
@@ -358,8 +358,8 @@ CRITICAL RULES:
 ${state.patientVerified ? `Patient verified: ${state.patientName}` : 'Verify patient identity before accessing any results.'}`;
 }
 
-function getAdminPrompt(): string {
-    return `${getMasterSystemPrompt()}
+function getAdminPrompt(practice: PracticeConfig): string {
+    return `${getMasterSystemPrompt(practice)}
 
 ═══ CURRENT MODE: ADMINISTRATIVE QUERIES ═══
 
@@ -383,8 +383,8 @@ If you genuinely don't know the answer:
 NEVER make up information. It's always better to transfer than guess.`;
 }
 
-function getEscalationPrompt(state: ConversationState): string {
-    return `${getMasterSystemPrompt()}
+function getEscalationPrompt(state: ConversationState, practice: PracticeConfig): string {
+    return `${getMasterSystemPrompt(practice)}
 
 ═══ CURRENT MODE: ESCALATION / TRANSFER ═══
 
@@ -440,6 +440,12 @@ If a caller is using abusive language:
 // ═══════════════════════════════════════════════════════════
 
 export async function processMessage(userMessage: string, currentState?: ConversationState): Promise<AgentResponse> {
+    // ── Load real data from database ──
+    const practice = await getPractice();
+    const patients = await getPatients();
+    const appointments = await getAppointments();
+    const testResults = await getTestResultsFromDB();
+
     // ── Initialize or restore state ──
     const state: ConversationState = currentState ? { ...currentState } : {
         callId: uuidv4(),
@@ -493,7 +499,7 @@ export async function processMessage(userMessage: string, currentState?: Convers
     // ═══ STEP 3: Patient Verification ═══
     if (!state.patientVerified && state.messages.length > 1) {
         const verificationAttempt = state.messages.filter(m => m.role === 'user').length;
-        const verResult = verifyPatientFromText(userMessage, verificationAttempt);
+        const verResult = verifyPatientFromText(userMessage, verificationAttempt, patients);
 
         if (verResult.verified && verResult.patient) {
             state.patientVerified = true;
@@ -537,13 +543,13 @@ export async function processMessage(userMessage: string, currentState?: Convers
     }
 
     // ═══ STEP 5.5: Execute Actions ═══
-    const actionResult = executeActions(state, userMessage);
+    const actionResult = executeActions(state, userMessage, practice, patients, appointments, testResults);
     if (actionResult.actions.length > 0) {
         state.actionsTaken.push(...actionResult.actions);
     }
 
     // ═══ STEP 6: Build LLM Prompt ═══
-    let systemPrompt = buildSystemPrompt(state, assessment);
+    let systemPrompt = buildSystemPrompt(state, assessment, practice, patients, appointments);
 
     // Inject action context so LLM has real data to use
     if (actionResult.contextForLLM) {
@@ -634,19 +640,19 @@ function routeToAgent(state: ConversationState): AgentType {
     }
 }
 
-function buildSystemPrompt(state: ConversationState, assessment: ClinicalAssessment): string {
+function buildSystemPrompt(state: ConversationState, assessment: ClinicalAssessment, practice: PracticeConfig, patients: PatientRecord[], appointments: AppointmentSlot[]): string {
     switch (state.currentAgent) {
-        case 'triage': return getTriagePrompt(state, assessment);
-        case 'appointment': return getAppointmentPrompt(state);
-        case 'prescription': return getPrescriptionPrompt(state);
-        case 'test_results': return getTestResultsPrompt(state);
-        case 'admin': return getAdminPrompt();
-        case 'escalation': return getEscalationPrompt(state);
+        case 'triage': return getTriagePrompt(state, practice, assessment);
+        case 'appointment': return getAppointmentPrompt(state, practice, appointments);
+        case 'prescription': return getPrescriptionPrompt(state, practice, patients);
+        case 'test_results': return getTestResultsPrompt(state, practice);
+        case 'admin': return getAdminPrompt(practice);
+        case 'escalation': return getEscalationPrompt(state, practice);
         default: {
             // Default orchestrator — determine what the patient needs
             const needsVerification = state.currentIntent && requiresVerification(state.currentIntent) && !state.patientVerified;
 
-            let prompt = getMasterSystemPrompt();
+            let prompt = getMasterSystemPrompt(practice);
             if (needsVerification) {
                 prompt += `\n\nThe patient needs ${state.currentIntent?.toLowerCase()} assistance but hasn't been verified yet.\n` +
                     `Ask for verification: "${getVerificationPrompt(state.messages.filter(m => m.role === 'user').length)}"`;

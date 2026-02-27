@@ -1,382 +1,469 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
     Cpu, Bot, Globe, Brain, Sparkles, Megaphone, CalendarClock,
     FileText, Activity, CheckCircle2, XCircle, Clock, AlertTriangle,
-    ShieldAlert, Zap, ArrowUpRight, TrendingUp, RefreshCw, ChevronRight,
-    Shield, FlaskConical, Mic, Calendar, Pill, User, Eye
+    ShieldAlert, Zap, RefreshCw, ChevronRight, Play, Loader2,
+    Shield, Send, Search, BarChart3
 } from 'lucide-react';
 import EmmaLogo from '@/components/EmmaLogo';
-import type { CommandCentreData } from '@/lib/types';
+
+// ════ TYPE DEFS FOR API RESPONSES ═══
+
+interface SystemStatus {
+    agentExecutor: { toolCount: number; status: string };
+    browserAgent: { sessionCount: number; allowedDomains: number; status: string };
+    memory: { totalPatients: number; totalFacts: number; factsByLayer: Record<string, number>; status: string };
+    selfImprove: { testCaseCount: number; lastRunResults: number; status: string };
+    outreach: { campaignCount: number; ruleCount: number; status: string };
+    schedule: { optimizationCount: number; dnaFactors: number; status: string };
+    documents: { pendingReview: number; totalDocuments: number; status: string };
+    healthMonitor: { activeAlerts: number; criticalCount: number; urgentCount: number; readingTypes: number; status: string };
+}
 
 // ═══ SUPERPOWER CONFIG ═══
 
 const SUPERPOWERS = [
-    { id: 'agent', label: 'Agent Executor', icon: Bot, color: '#8B5CF6', gradient: 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)' },
-    { id: 'browser', label: 'Browser Agent', icon: Globe, color: '#3B82F6', gradient: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)' },
-    { id: 'memory', label: 'Memory Store', icon: Brain, color: '#EC4899', gradient: 'linear-gradient(135deg, #EC4899 0%, #BE185D 100%)' },
-    { id: 'improve', label: 'Self-Improve', icon: Sparkles, color: '#F59E0B', gradient: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)' },
-    { id: 'outreach', label: 'Outreach', icon: Megaphone, color: '#10B981', gradient: 'linear-gradient(135deg, #10B981 0%, #059669 100%)' },
-    { id: 'schedule', label: 'Schedule AI', icon: CalendarClock, color: '#06B6D4', gradient: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)' },
-    { id: 'documents', label: 'Doc Author', icon: FileText, color: '#F97316', gradient: 'linear-gradient(135deg, #F97316 0%, #EA580C 100%)' },
-    { id: 'health', label: 'Health Monitor', icon: Activity, color: '#EF4444', gradient: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)' },
+    { id: 'agent', label: 'Agent Executor', desc: 'Groq ReAct + 17 Tools', icon: Bot, color: '#8B5CF6', gradient: 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)' },
+    { id: 'browser', label: 'Browser Agent', desc: 'AI-Driven NHS Automation', icon: Globe, color: '#3B82F6', gradient: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)' },
+    { id: 'memory', label: 'Memory Store', desc: 'Groq Extraction + Persistence', icon: Brain, color: '#EC4899', gradient: 'linear-gradient(135deg, #EC4899 0%, #BE185D 100%)' },
+    { id: 'improve', label: 'Self-Improve', desc: 'Real Safety Test Runner', icon: Sparkles, color: '#F59E0B', gradient: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)' },
+    { id: 'outreach', label: 'Outreach', desc: 'AI-Generated Messages', icon: Megaphone, color: '#10B981', gradient: 'linear-gradient(135deg, #10B981 0%, #059669 100%)' },
+    { id: 'schedule', label: 'Schedule AI', desc: 'DNA Prediction + Gap-Fill', icon: CalendarClock, color: '#06B6D4', gradient: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)' },
+    { id: 'documents', label: 'Doc Author', desc: 'AI Clinical Documents', icon: FileText, color: '#F97316', gradient: 'linear-gradient(135deg, #F97316 0%, #EA580C 100%)' },
+    { id: 'health', label: 'Health Monitor', desc: 'Live Alert Processing', icon: Activity, color: '#EF4444', gradient: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)' },
 ];
 
+// ═══ API HELPER ═══
+
+async function callAPI(action: string, payload: Record<string, unknown> = {}) {
+    const res = await fetch('/api/command-centre', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, payload }),
+    });
+    return res.json();
+}
+
+// ═══ STYLES ═══
+
+const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '10px 14px', borderRadius: '10px',
+    background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-subtle)',
+    color: 'white', fontSize: '0.8125rem', outline: 'none',
+};
+
+const btnStyle = (color: string, disabled?: boolean): React.CSSProperties => ({
+    padding: '8px 18px', borderRadius: '10px', border: 'none', fontWeight: 600,
+    fontSize: '0.75rem', cursor: disabled ? 'not-allowed' : 'pointer',
+    background: disabled ? 'rgba(255,255,255,0.05)' : color, color: 'white',
+    display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
+    opacity: disabled ? 0.5 : 1, transition: 'all 0.2s',
+});
+
+const resultBoxStyle = (color: string): React.CSSProperties => ({
+    marginTop: '16px', padding: '16px', borderRadius: '12px',
+    background: `${color}08`, border: `1px solid ${color}22`,
+    maxHeight: '400px', overflow: 'auto',
+});
+
+// ═══ MAIN PAGE ═══
+
 export default function CommandCentrePage() {
-    const [data, setData] = useState<CommandCentreData | null>(null);
+    const [status, setStatus] = useState<SystemStatus | null>(null);
     const [activePanel, setActivePanel] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
+    const refresh = useCallback(() => {
+        setLoading(true);
         fetch('/api/command-centre')
             .then(r => r.json())
-            .then(d => { setData(d); setLoading(false); })
+            .then(d => { setStatus(d); setLoading(false); })
             .catch(() => setLoading(false));
     }, []);
 
-    if (loading || !data) {
+    useEffect(() => { refresh(); }, [refresh]);
+
+    if (loading || !status) {
         return (
             <main className="zyricon-main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ textAlign: 'center', animation: 'fadeIn 0.5s' }}>
-                    <div style={{ transform: 'scale(1.5)', marginBottom: '24px' }}><EmmaLogo size={64} showText={false} /></div>
-                    <h2 style={{ fontSize: '1.5rem', color: 'white', fontWeight: 500 }}>Initialising Command Centre...</h2>
-                    <p style={{ color: 'var(--text-muted)', marginTop: '8px' }}>Loading 8 superpowers</p>
+                <div style={{ textAlign: 'center' }}>
+                    <EmmaLogo size={64} showText={false} />
+                    <h2 style={{ fontSize: '1.5rem', color: 'white', fontWeight: 500, marginTop: '16px' }}>Initialising Superpowers...</h2>
+                    <p style={{ color: 'var(--text-muted)', marginTop: '8px' }}>Loading 8 AI engines</p>
                 </div>
             </main>
         );
     }
 
+    const getStatusLine = (id: string) => {
+        switch (id) {
+            case 'agent': return `${status.agentExecutor.toolCount} tools ready`;
+            case 'browser': return `${status.browserAgent.sessionCount} sessions • ${status.browserAgent.allowedDomains} domains`;
+            case 'memory': return `${status.memory.totalPatients} patients • ${status.memory.totalFacts} facts`;
+            case 'improve': return `${status.selfImprove.testCaseCount} tests • ${status.selfImprove.lastRunResults} results`;
+            case 'outreach': return `${status.outreach.campaignCount} campaigns • ${status.outreach.ruleCount} rules`;
+            case 'schedule': return `${status.schedule.optimizationCount} runs • ${status.schedule.dnaFactors} DNA factors`;
+            case 'documents': return `${status.documents.pendingReview} pending • ${status.documents.totalDocuments} total`;
+            case 'health': return `${status.healthMonitor.activeAlerts} alerts • ${status.healthMonitor.readingTypes} types`;
+            default: return '';
+        }
+    };
+
     return (
         <main className="zyricon-main" style={{ padding: '24px 32px', overflow: 'auto' }}>
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
                 <div>
                     <h1 style={{ fontSize: '1.75rem', fontWeight: 600, color: 'white', display: 'flex', alignItems: 'center', gap: '12px', letterSpacing: '-0.02em' }}>
                         <Cpu size={28} /> Command Centre
                     </h1>
-                    <p style={{ color: 'var(--text-muted)', marginTop: '4px', fontSize: '0.875rem' }}>
-                        8 superpowers • {data.masterGraph.totalProcessed.toLocaleString()} tasks processed • Avg {data.masterGraph.avgProcessingMs}ms
+                    <p style={{ color: 'var(--text-muted)', marginTop: '4px', fontSize: '0.8125rem' }}>
+                        8 AI Superpowers — Real Groq-powered engines — Interactive controls
                     </p>
                 </div>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <div style={{ padding: '6px 14px', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '20px', fontSize: '0.75rem', color: '#22C55E', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22C55E', animation: 'pulse 2s infinite' }} /> All Systems Operational
+                    <div style={{ padding: '6px 14px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '20px', fontSize: '0.75rem', color: '#22C55E', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22C55E', animation: 'pulse 2s infinite' }} /> All Engines Ready
                     </div>
-                    <button className="zs-card-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={() => window.location.reload()}><RefreshCw size={14} /> Refresh</button>
+                    <button style={btnStyle('rgba(255,255,255,0.1)')} onClick={refresh}><RefreshCw size={14} /> Refresh</button>
                 </div>
             </div>
 
-            {/* Superpower Grid — Overview Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
+            {/* Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '24px' }}>
                 {SUPERPOWERS.map(sp => {
                     const Icon = sp.icon;
                     const isActive = activePanel === sp.id;
                     return (
                         <div key={sp.id} onClick={() => setActivePanel(isActive ? null : sp.id)}
-                            style={{ padding: '20px', background: isActive ? `${sp.color}11` : 'var(--bg-card)', border: `1px solid ${isActive ? sp.color + '44' : 'var(--border-subtle)'}`, borderRadius: '16px', cursor: 'pointer', transition: 'all 0.3s', position: 'relative', overflow: 'hidden' }}
-                        >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: sp.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Icon size={20} color="white" />
+                            style={{ padding: '18px', background: isActive ? `${sp.color}11` : 'var(--bg-card)', border: `1px solid ${isActive ? sp.color + '44' : 'var(--border-subtle)'}`, borderRadius: '14px', cursor: 'pointer', transition: 'all 0.3s' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: sp.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Icon size={18} color="white" />
                                 </div>
-                                <ChevronRight size={16} style={{ color: 'var(--text-muted)', transform: isActive ? 'rotate(90deg)' : 'none', transition: 'transform 0.3s' }} />
+                                <ChevronRight size={14} style={{ color: 'var(--text-muted)', transform: isActive ? 'rotate(90deg)' : 'none', transition: 'transform 0.3s' }} />
                             </div>
-                            <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'white', marginBottom: '4px' }}>{sp.label}</div>
-                            <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
-                                {sp.id === 'agent' && `${data.agentExecutor.totalExecutions.toLocaleString()} executions • ${(data.agentExecutor.successRate * 100).toFixed(1)}% success`}
-                                {sp.id === 'browser' && `${data.browserAgent.totalSessions} sessions • ${(data.browserAgent.successRate * 100).toFixed(1)}% success`}
-                                {sp.id === 'memory' && `${data.memory.totalPatients} patients • ${data.memory.totalFacts} facts stored`}
-                                {sp.id === 'improve' && `${data.selfImprove.totalImprovements} improvements • Safety: ${data.selfImprove.safetyGateStatus}`}
-                                {sp.id === 'outreach' && `${data.outreach.activeCampaigns.length} campaigns • ${data.outreach.todayBooked} booked today`}
-                                {sp.id === 'schedule' && `Score: ${data.schedule.todayOptimization.optimizationScore}% • ${data.schedule.gapsFilled} gaps filled`}
-                                {sp.id === 'documents' && `${data.documents.pendingReview.length} pending • ${data.documents.todayDrafted} drafted today`}
-                                {sp.id === 'health' && `${data.healthMonitor.criticalCount} critical • ${data.healthMonitor.urgentCount} urgent alerts`}
-                            </div>
+                            <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'white' }}>{sp.label}</div>
+                            <div style={{ fontSize: '0.625rem', color: sp.color, marginTop: '2px' }}>{sp.desc}</div>
+                            <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '4px' }}>{getStatusLine(sp.id)}</div>
                         </div>
                     );
                 })}
             </div>
 
-            {/* Expanded Detail Panel */}
+            {/* Expanded Action Panel */}
             {activePanel && (
-                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '20px', padding: '24px', marginBottom: '24px', animation: 'fadeIn 0.3s' }}>
-                    {activePanel === 'agent' && <AgentExecutorPanel data={data} />}
-                    {activePanel === 'browser' && <BrowserAgentPanel data={data} />}
-                    {activePanel === 'memory' && <MemoryPanel data={data} />}
-                    {activePanel === 'improve' && <SelfImprovePanel data={data} />}
-                    {activePanel === 'outreach' && <OutreachPanel data={data} />}
-                    {activePanel === 'schedule' && <SchedulePanel data={data} />}
-                    {activePanel === 'documents' && <DocumentsPanel data={data} />}
-                    {activePanel === 'health' && <HealthPanel data={data} />}
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '16px', padding: '24px', marginBottom: '24px', animation: 'fadeIn 0.3s' }}>
+                    {activePanel === 'agent' && <AgentPanel />}
+                    {activePanel === 'browser' && <BrowserPanel />}
+                    {activePanel === 'memory' && <MemoryPanel />}
+                    {activePanel === 'improve' && <SafetyPanel />}
+                    {activePanel === 'outreach' && <OutreachPanel />}
+                    {activePanel === 'schedule' && <SchedulePanel />}
+                    {activePanel === 'documents' && <DocumentPanel />}
+                    {activePanel === 'health' && <HealthPanel />}
                 </div>
             )}
-
-            {/* Master Graph Status */}
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '20px', padding: '24px' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'white', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Zap size={18} /> Master Graph Pipeline
-                </h3>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {['intake', 'memory_recall', 'intent_classify', 'safety_check', 'triage', 'agent_route', 'tool_execute', 'browser_act', 'document_draft', 'outreach_check', 'schedule_optimize', 'health_scan', 'self_improve_eval', 'snomed_extract', 'urgency_assign', 'response_generate', 'memory_store', 'audit_log', 'checkpoint', 'notification'].map((node, i) => (
-                        <div key={node} style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '0.6875rem', fontWeight: 500, background: i < 18 ? 'rgba(34, 197, 94, 0.1)' : 'rgba(255,255,255,0.05)', color: i < 18 ? '#22C55E' : 'var(--text-muted)', border: `1px solid ${i < 18 ? 'rgba(34, 197, 94, 0.2)' : 'var(--border-subtle)'}`, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            {i < 18 ? <CheckCircle2 size={10} /> : <Clock size={10} />}
-                            {node.replace(/_/g, ' ')}
-                        </div>
-                    ))}
-                </div>
-                <div style={{ marginTop: '16px', display: 'flex', gap: '24px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    <span>Total processed: <strong style={{ color: 'white' }}>{data.masterGraph.totalProcessed.toLocaleString()}</strong></span>
-                    <span>Avg latency: <strong style={{ color: 'white' }}>{data.masterGraph.avgProcessingMs}ms</strong></span>
-                    <span>Nodes: <strong style={{ color: 'white' }}>20</strong></span>
-                    <span>Engines: <strong style={{ color: 'white' }}>8</strong></span>
-                </div>
-            </div>
         </main>
     );
 }
 
-// ═══ DETAIL PANELS ═══
+// ═══ SP1: AGENT EXECUTOR PANEL ═══
 
-function AgentExecutorPanel({ data }: { data: CommandCentreData }) {
+function AgentPanel() {
+    const [input, setInput] = useState('');
+    const [running, setRunning] = useState(false);
+    const [result, setResult] = useState<Record<string, unknown> | null>(null);
+
+    const run = async () => {
+        if (!input.trim()) return;
+        setRunning(true); setResult(null);
+        const res = await callAPI('execute-agent', { message: input });
+        setResult(res.data || res);
+        setRunning(false);
+    };
+
     return (
         <div>
-            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#8B5CF6', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Bot size={18} /> Autonomous Agent Executor — 17 Tools</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                <StatCard label="Total Executions" value={data.agentExecutor.totalExecutions.toLocaleString()} color="#8B5CF6" />
-                <StatCard label="Avg Steps/Task" value={data.agentExecutor.avgStepsPerTask.toFixed(1)} color="#8B5CF6" />
-                <StatCard label="Success Rate" value={`${(data.agentExecutor.successRate * 100).toFixed(1)}%`} color="#22C55E" />
-                <StatCard label="Active Traces" value={data.agentExecutor.activeTraces.length.toString()} color="#F59E0B" />
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#8B5CF6', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}><Bot size={18} /> Autonomous Agent Executor</h3>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Type a patient request → AI plans the tool chain → executes each step via Groq</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+                <input style={inputStyle} placeholder="e.g. Book an appointment for Sarah Jenkins who has a persistent cough" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && run()} />
+                <button style={btnStyle('#8B5CF6', running)} onClick={run} disabled={running}>
+                    {running ? <Loader2 size={14} className="spin" /> : <Play size={14} />} {running ? 'Running...' : 'Execute'}
+                </button>
             </div>
-            {data.agentExecutor.activeTraces.map(trace => (
-                <div key={trace.id} style={{ padding: '16px', background: 'rgba(139, 92, 246, 0.05)', border: '1px solid rgba(139, 92, 246, 0.15)', borderRadius: '12px', marginBottom: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                        <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'white' }}>{trace.triggerMessage.slice(0, 60)}...</div>
-                        <span style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '0.625rem', fontWeight: 700, background: trace.status === 'completed' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)', color: trace.status === 'completed' ? '#22C55E' : '#F59E0B' }}>{trace.status.toUpperCase()}</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                        {trace.steps.map((step, i) => (
-                            <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.625rem', fontWeight: 500, background: step.status === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: step.status === 'success' ? '#22C55E' : '#EF4444' }}>
-                                {step.status === 'success' ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
-                                {step.toolName}
-                                <span style={{ color: 'var(--text-muted)' }}>{step.durationMs}ms</span>
-                            </div>
-                        ))}
-                    </div>
-                    <div style={{ marginTop: '8px', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
-                        {trace.completedSteps}/{trace.totalSteps} steps • {trace.totalDurationMs}ms total
-                    </div>
-                </div>
-            ))}
+            {result && <ResultDisplay data={result} color="#8B5CF6" />}
         </div>
     );
 }
 
-function BrowserAgentPanel({ data }: { data: CommandCentreData }) {
+// ═══ SP2: BROWSER PANEL ═══
+
+function BrowserPanel() {
+    const [task, setTask] = useState('');
+    const [domain, setDomain] = useState('e-referral.nhs.uk');
+    const [running, setRunning] = useState(false);
+    const [result, setResult] = useState<Record<string, unknown> | null>(null);
+
+    const run = async () => {
+        if (!task.trim()) return;
+        setRunning(true); setResult(null);
+        const res = await callAPI('browser-task', { task, domain });
+        setResult(res.data || res);
+        setRunning(false);
+    };
+
     return (
         <div>
-            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#3B82F6', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Globe size={18} /> Browser Agent — NHS System Automation</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                <StatCard label="Total Sessions" value={data.browserAgent.totalSessions.toString()} color="#3B82F6" />
-                <StatCard label="Success Rate" value={`${(data.browserAgent.successRate * 100).toFixed(1)}%`} color="#22C55E" />
-                <StatCard label="Active" value={data.browserAgent.activeSessions.filter(s => s.status === 'active').length.toString()} color="#F59E0B" />
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#3B82F6', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}><Globe size={18} /> Browser Agent</h3>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Describe an NHS system task → AI generates the complete browser action sequence</p>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                <input style={inputStyle} placeholder="e.g. Submit a 2-week-wait referral for suspected lung cancer" value={task} onChange={e => setTask(e.target.value)} />
+                <select style={{ ...inputStyle, width: '200px' }} value={domain} onChange={e => setDomain(e.target.value)}>
+                    <option value="e-referral.nhs.uk">eRS (e-Referral)</option>
+                    <option value="spine.nhs.uk">NHS Spine</option>
+                    <option value="gp-clinical.nhs.uk">GP Clinical</option>
+                    <option value="emis.com">EMIS Web</option>
+                </select>
+                <button style={btnStyle('#3B82F6', running)} onClick={run} disabled={running}>
+                    {running ? <Loader2 size={14} className="spin" /> : <Globe size={14} />} {running ? 'Generating...' : 'Run'}
+                </button>
             </div>
-            {data.browserAgent.activeSessions.map(session => (
-                <div key={session.id} style={{ padding: '16px', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.15)', borderRadius: '12px', marginBottom: '12px' }}>
-                    <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'white', marginBottom: '4px' }}>{session.taskDescription}</div>
-                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '12px' }}>{session.domain} • {session.actions.length} actions • {session.securityFlags.length === 0 ? '✓ No security flags' : session.securityFlags.join(', ')}</div>
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                        {session.actions.map(action => (
-                            <span key={action.id} style={{ padding: '3px 8px', borderRadius: '4px', fontSize: '0.5625rem', fontWeight: 600, background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }}>
-                                {action.actionType} → {action.target?.split('/').pop() || action.value?.slice(0, 20) || '...'}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-            ))}
+            {result && <ResultDisplay data={result} color="#3B82F6" />}
         </div>
     );
 }
 
-function MemoryPanel({ data }: { data: CommandCentreData }) {
+// ═══ SP3: MEMORY PANEL ═══
+
+function MemoryPanel() {
+    const [text, setText] = useState('');
+    const [running, setRunning] = useState(false);
+    const [result, setResult] = useState<Record<string, unknown> | null>(null);
+
+    const extract = async () => {
+        if (!text.trim()) return;
+        setRunning(true); setResult(null);
+        const res = await callAPI('extract-memory', { text, nhsNumber: '193 482 9103' });
+        setResult(res.data || res);
+        setRunning(false);
+    };
+
     return (
         <div>
-            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#EC4899', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Brain size={18} /> Long-Horizon Memory — 4 Layers</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                {Object.entries(data.memory.factsByLayer).map(([layer, count]) => (
-                    <StatCard key={layer} label={layer.charAt(0).toUpperCase() + layer.slice(1)} value={count.toString()} color="#EC4899" />
-                ))}
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#EC4899', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}><Brain size={18} /> Long-Horizon Memory</h3>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Paste conversation text → AI extracts patient facts → persists to memory file</p>
+            <textarea style={{ ...inputStyle, height: '80px', resize: 'vertical' }} placeholder="e.g. Patient mentioned they prefer morning appointments, allergic to penicillin, works night shifts at a warehouse, and is anxious about blood tests" value={text} onChange={e => setText(e.target.value)} />
+            <div style={{ marginTop: '10px' }}>
+                <button style={btnStyle('#EC4899', running)} onClick={extract} disabled={running}>
+                    {running ? <Loader2 size={14} className="spin" /> : <Search size={14} />} {running ? 'Extracting...' : 'Extract Facts'}
+                </button>
             </div>
-            <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'white', marginBottom: '12px' }}>Recent Patient Facts</div>
-            {data.memory.recentFacts.map(fact => (
-                <div key={fact.id} style={{ padding: '12px', background: 'rgba(236, 72, 153, 0.05)', border: '1px solid rgba(236, 72, 153, 0.15)', borderRadius: '10px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                        <div style={{ fontSize: '0.8125rem', color: 'white' }}>{fact.fact}</div>
-                        <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                            {fact.category} • confidence: {(fact.confidence * 100).toFixed(0)}% • accessed {fact.accessCount}x
-                        </div>
-                    </div>
-                    <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '0.5625rem', fontWeight: 700, background: 'rgba(236,72,153,0.15)', color: '#EC4899' }}>{fact.layer}</span>
-                </div>
-            ))}
+            {result && <ResultDisplay data={result} color="#EC4899" />}
         </div>
     );
 }
 
-function SelfImprovePanel({ data }: { data: CommandCentreData }) {
+// ═══ SP4: SAFETY TEST PANEL ═══
+
+function SafetyPanel() {
+    const [running, setRunning] = useState(false);
+    const [result, setResult] = useState<Record<string, unknown> | null>(null);
+
+    const runAll = async () => {
+        setRunning(true); setResult(null);
+        const res = await callAPI('run-safety-tests');
+        setResult(res.data || res);
+        setRunning(false);
+    };
+
     return (
         <div>
-            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#F59E0B', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Sparkles size={18} /> Self-Improvement Engine — Safety-Gated</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                <StatCard label="Improvements" value={data.selfImprove.totalImprovements.toString()} color="#F59E0B" />
-                <StatCard label="Active A/B Tests" value={data.selfImprove.activeTests.length.toString()} color="#3B82F6" />
-                <StatCard label="Safety Gate" value={data.selfImprove.safetyGateStatus.toUpperCase()} color={data.selfImprove.safetyGateStatus === 'passing' ? '#22C55E' : '#EF4444'} />
-                <StatCard label="Prompt Versions" value={data.selfImprove.currentVersions.length.toString()} color="#8B5CF6" />
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#F59E0B', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}><Sparkles size={18} /> Self-Improvement Engine</h3>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '16px' }}>12 safety test cases → each sent through Groq as EMMA → AI judge evaluates pass/fail</p>
+            <div style={{ padding: '10px 14px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '8px', marginBottom: '16px', fontSize: '0.6875rem', color: '#F59E0B', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Shield size={14} /> 100% red flag detection required to pass safety gate
             </div>
-            {data.selfImprove.currentVersions.map(v => (
-                <div key={v.id} style={{ padding: '12px 16px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: '10px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                        <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'white' }}>{v.agentType}</span>
-                        <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginLeft: '8px' }}>v{v.version}</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)' }}>Safety: {(v.safetyScore * 100).toFixed(0)}%</span>
-                        <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)' }}>Red flags: {(v.redFlagCatchRate * 100).toFixed(0)}%</span>
-                        <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '0.5625rem', fontWeight: 700, background: v.status === 'deployed' ? 'rgba(34,197,94,0.15)' : v.status === 'testing' ? 'rgba(59,130,246,0.15)' : 'rgba(239,68,68,0.15)', color: v.status === 'deployed' ? '#22C55E' : v.status === 'testing' ? '#3B82F6' : '#EF4444' }}>{v.status}</span>
-                    </div>
-                </div>
-            ))}
+            <button style={btnStyle('#F59E0B', running)} onClick={runAll} disabled={running}>
+                {running ? <Loader2 size={14} className="spin" /> : <Play size={14} />} {running ? 'Running 12 tests (this takes ~30s)...' : 'Run All Safety Tests'}
+            </button>
+            {result && <ResultDisplay data={result} color="#F59E0B" />}
         </div>
     );
 }
 
-function OutreachPanel({ data }: { data: CommandCentreData }) {
+// ═══ SP5: OUTREACH PANEL ═══
+
+function OutreachPanel() {
+    const [running, setRunning] = useState(false);
+    const [result, setResult] = useState<Record<string, unknown> | null>(null);
+
+    const scan = async () => {
+        setRunning(true); setResult(null);
+        const res = await callAPI('run-outreach-scan');
+        setResult(res.data || res);
+        setRunning(false);
+    };
+
     return (
         <div>
-            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#10B981', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Megaphone size={18} /> Proactive Patient Outreach</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                <StatCard label="Contacted Today" value={data.outreach.todayContacted.toString()} color="#10B981" />
-                <StatCard label="Responded" value={data.outreach.todayResponded.toString()} color="#3B82F6" />
-                <StatCard label="Booked" value={data.outreach.todayBooked.toString()} color="#22C55E" />
-            </div>
-            {data.outreach.activeCampaigns.map(camp => (
-                <div key={camp.id} style={{ padding: '12px 16px', background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.15)', borderRadius: '10px', marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'white' }}>{camp.name}</span>
-                        <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '0.5625rem', fontWeight: 700, background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>{camp.status}</span>
-                    </div>
-                    <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '4px', height: '6px', overflow: 'hidden', marginBottom: '8px' }}>
-                        <div style={{ height: '100%', width: `${(camp.bookedCount / camp.targetCount) * 100}%`, background: '#10B981', borderRadius: '4px', transition: 'width 1s' }} />
-                    </div>
-                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', display: 'flex', gap: '16px' }}>
-                        <span>Target: {camp.targetCount}</span>
-                        <span>Sent: {camp.sentCount}</span>
-                        <span>Responded: {camp.respondedCount}</span>
-                        <span style={{ color: '#22C55E' }}>Booked: {camp.bookedCount}</span>
-                    </div>
-                </div>
-            ))}
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#10B981', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}><Megaphone size={18} /> Proactive Outreach</h3>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Scans patient database → identifies patients needing contact → AI writes personalised messages</p>
+            <button style={btnStyle('#10B981', running)} onClick={scan} disabled={running}>
+                {running ? <Loader2 size={14} className="spin" /> : <Send size={14} />} {running ? 'Scanning & generating...' : 'Run Daily Outreach Scan'}
+            </button>
+            {result && <ResultDisplay data={result} color="#10B981" />}
         </div>
     );
 }
 
-function SchedulePanel({ data }: { data: CommandCentreData }) {
-    const opt = data.schedule.todayOptimization;
+// ═══ SP6: SCHEDULE PANEL ═══
+
+function SchedulePanel() {
+    const [running, setRunning] = useState(false);
+    const [result, setResult] = useState<Record<string, unknown> | null>(null);
+
+    const optimize = async () => {
+        setRunning(true); setResult(null);
+        const res = await callAPI('optimize-schedule');
+        setResult(res.data || res);
+        setRunning(false);
+    };
+
     return (
         <div>
-            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#06B6D4', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><CalendarClock size={18} /> Autonomous Schedule Optimizer</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                <StatCard label="Optimization Score" value={`${opt.optimizationScore}%`} color="#06B6D4" />
-                <StatCard label="Slots Filled" value={`${opt.optimizedSlots}/${opt.totalSlots}`} color="#22C55E" />
-                <StatCard label="DNA Predicted" value={opt.predictedDNAs.toString()} color="#F59E0B" />
-                <StatCard label="Avg Fill Time" value={`${opt.avgFillTimeMinutes} min`} color="#8B5CF6" />
-            </div>
-            <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'white', marginBottom: '12px' }}>DNA Risk Predictions</div>
-            {data.schedule.predictedDNAs.map(pred => (
-                <div key={pred.slotId} style={{ padding: '12px 16px', background: 'rgba(6,182,212,0.05)', border: '1px solid rgba(6,182,212,0.15)', borderRadius: '10px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                        <span style={{ fontSize: '0.8125rem', color: 'white', fontWeight: 500 }}>{pred.patientName}</span>
-                        <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginLeft: '8px' }}>{pred.slotTime}</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <div style={{ width: '60px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', height: '6px', overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${pred.dnaProbability * 100}%`, background: pred.dnaProbability > 0.5 ? '#EF4444' : pred.dnaProbability > 0.25 ? '#F59E0B' : '#22C55E', borderRadius: '4px' }} />
-                        </div>
-                        <span style={{ fontSize: '0.625rem', color: pred.dnaProbability > 0.5 ? '#EF4444' : '#F59E0B', fontWeight: 700 }}>{(pred.dnaProbability * 100).toFixed(0)}%</span>
-                        <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '0.5625rem', fontWeight: 700, background: pred.recommendation === 'avoid' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)', color: pred.recommendation === 'avoid' ? '#EF4444' : '#F59E0B' }}>{pred.recommendation.replace(/_/g, ' ')}</span>
-                    </div>
-                </div>
-            ))}
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#06B6D4', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}><CalendarClock size={18} /> Schedule Optimizer</h3>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Generates today&apos;s schedule → 8-factor DNA risk scoring → AI gap-fill SMS messages</p>
+            <button style={btnStyle('#06B6D4', running)} onClick={optimize} disabled={running}>
+                {running ? <Loader2 size={14} className="spin" /> : <BarChart3 size={14} />} {running ? 'Optimizing...' : 'Optimize Today\'s Schedule'}
+            </button>
+            {result && <ResultDisplay data={result} color="#06B6D4" />}
         </div>
     );
 }
 
-function DocumentsPanel({ data }: { data: CommandCentreData }) {
+// ═══ SP7: DOCUMENT PANEL ═══
+
+function DocumentPanel() {
+    const [docType, setDocType] = useState('referral_letter');
+    const [patient, setPatient] = useState('');
+    const [context, setContext] = useState('');
+    const [running, setRunning] = useState(false);
+    const [result, setResult] = useState<Record<string, unknown> | null>(null);
+
+    const draft = async () => {
+        if (!context.trim()) return;
+        setRunning(true); setResult(null);
+        const res = await callAPI('generate-document', {
+            type: docType, nhsNumber: '193 482 9103',
+            patientName: patient || 'Sarah Jenkins',
+            clinicalContext: context,
+        });
+        setResult(res.data || res);
+        setRunning(false);
+    };
+
     return (
         <div>
-            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#F97316', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><FileText size={18} /> Clinical Document Author — GP Approval Lock</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                <StatCard label="Pending Review" value={data.documents.pendingReview.length.toString()} color="#F97316" />
-                <StatCard label="Drafted Today" value={data.documents.todayDrafted.toString()} color="#3B82F6" />
-                <StatCard label="Approved Today" value={data.documents.todayApproved.toString()} color="#22C55E" />
-            </div>
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#F97316', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}><FileText size={18} /> Clinical Document Author</h3>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Select document type → provide clinical context → AI drafts full NHS document</p>
             <div style={{ padding: '10px 14px', background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)', borderRadius: '8px', marginBottom: '16px', fontSize: '0.6875rem', color: '#F97316', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Shield size={14} /> HARD LOCK: No document can be sent without GP_APPROVED status
+                <Shield size={14} /> HARD LOCK: No document sent without GP_APPROVED status
             </div>
-            {data.documents.pendingReview.map(doc => (
-                <div key={doc.id} style={{ padding: '16px', background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.15)', borderRadius: '12px', marginBottom: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'white' }}>{doc.title}</span>
-                        <span style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '0.5625rem', fontWeight: 700, background: doc.status === 'AWAITING_GP_REVIEW' ? 'rgba(245,158,11,0.15)' : 'rgba(34,197,94,0.15)', color: doc.status === 'AWAITING_GP_REVIEW' ? '#F59E0B' : '#22C55E' }}>{doc.status.replace(/_/g, ' ')}</span>
-                    </div>
-                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', display: 'flex', gap: '16px' }}>
-                        <span>Type: {doc.type.replace(/_/g, ' ')}</span>
-                        <span>Patient: {doc.patientName}</span>
-                        <span>NICE: {doc.niceGuidelinesReferenced.join(', ')}</span>
-                    </div>
-                </div>
-            ))}
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                <select style={{ ...inputStyle, width: '200px' }} value={docType} onChange={e => setDocType(e.target.value)}>
+                    <option value="referral_letter">Referral Letter</option>
+                    <option value="fit_note">Fit Note (MED3)</option>
+                    <option value="two_week_wait">2-Week Wait (Cancer)</option>
+                    <option value="insurance_report">Insurance Report</option>
+                    <option value="care_plan">Care Plan</option>
+                    <option value="discharge_summary">Discharge Summary</option>
+                </select>
+                <input style={inputStyle} placeholder="Patient name" value={patient} onChange={e => setPatient(e.target.value)} />
+            </div>
+            <textarea style={{ ...inputStyle, height: '60px', resize: 'vertical' }} placeholder="e.g. 65-year-old male with persistent cough >3 weeks, weight loss 5kg, ex-smoker 30 pack-years. CXR shows 3cm right upper lobe mass." value={context} onChange={e => setContext(e.target.value)} />
+            <div style={{ marginTop: '10px' }}>
+                <button style={btnStyle('#F97316', running)} onClick={draft} disabled={running}>
+                    {running ? <Loader2 size={14} className="spin" /> : <FileText size={14} />} {running ? 'AI drafting...' : 'Draft Document'}
+                </button>
+            </div>
+            {result && <DocumentResult data={result} />}
         </div>
     );
 }
 
-function HealthPanel({ data }: { data: CommandCentreData }) {
+// ═══ SP8: HEALTH MONITOR PANEL ═══
+
+function HealthPanel() {
+    const [readingType, setReadingType] = useState('blood_pressure_systolic');
+    const [value, setValue] = useState('');
+    const [name, setName] = useState('');
+    const [running, setRunning] = useState(false);
+    const [result, setResult] = useState<Record<string, unknown> | null>(null);
+
+    const submit = async () => {
+        if (!value) return;
+        setRunning(true); setResult(null);
+        const res = await callAPI('process-reading', {
+            nhsNumber: '193 482 9103',
+            patientName: name || 'Sarah Jenkins',
+            readingType, value: parseFloat(value),
+        });
+        setResult(res.data || res);
+        setRunning(false);
+    };
+
     return (
         <div>
-            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#EF4444', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={18} /> Health Data Monitor — Contextualised Alerts</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                <StatCard label="Critical" value={data.healthMonitor.criticalCount.toString()} color="#EF4444" />
-                <StatCard label="Urgent" value={data.healthMonitor.urgentCount.toString()} color="#F59E0B" />
-                <StatCard label="Monitor" value={data.healthMonitor.monitorCount.toString()} color="#3B82F6" />
-                <StatCard label="Readings Today" value={data.healthMonitor.recentReadings.length.toString()} color="#22C55E" />
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#EF4444', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={18} /> Health Data Monitor</h3>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Submit a reading → threshold evaluation → Groq AI contextualises the alert</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+                <select style={{ ...inputStyle, width: '220px' }} value={readingType} onChange={e => setReadingType(e.target.value)}>
+                    <option value="blood_pressure_systolic">BP Systolic (mmHg)</option>
+                    <option value="blood_pressure_diastolic">BP Diastolic (mmHg)</option>
+                    <option value="heart_rate">Heart Rate (bpm)</option>
+                    <option value="blood_glucose">Blood Glucose (mmol/L)</option>
+                    <option value="spo2">SpO2 (%)</option>
+                    <option value="temperature">Temperature (°C)</option>
+                </select>
+                <input style={{ ...inputStyle, width: '120px' }} type="number" placeholder="Value" value={value} onChange={e => setValue(e.target.value)} />
+                <input style={inputStyle} placeholder="Patient name" value={name} onChange={e => setName(e.target.value)} />
+                <button style={btnStyle('#EF4444', running)} onClick={submit} disabled={running}>
+                    {running ? <Loader2 size={14} className="spin" /> : <Activity size={14} />} {running ? 'Processing...' : 'Submit'}
+                </button>
             </div>
-            {data.healthMonitor.activeAlerts.map(alert => (
-                <div key={alert.id} style={{ padding: '14px 16px', background: alert.tier === 'CRITICAL' ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.05)', border: `1px solid ${alert.tier === 'CRITICAL' ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.15)'}`, borderRadius: '12px', marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {alert.tier === 'CRITICAL' ? <ShieldAlert size={16} color="#EF4444" /> : <AlertTriangle size={16} color="#F59E0B" />}
-                            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'white' }}>{alert.patientName}</span>
-                        </div>
-                        <span style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '0.5625rem', fontWeight: 700, background: alert.tier === 'CRITICAL' ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.15)', color: alert.tier === 'CRITICAL' ? '#EF4444' : '#F59E0B' }}>{alert.tier}</span>
-                    </div>
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>{alert.description}</div>
-                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
-                        Action: {alert.recommendedAction.slice(0, 80)}...
-                        {alert.autoResponseTriggered && <span style={{ color: '#EF4444', marginLeft: '8px', fontWeight: 600 }}>AUTO-RESPONSE TRIGGERED</span>}
-                    </div>
-                </div>
-            ))}
+            {result && <ResultDisplay data={result} color="#EF4444" />}
         </div>
     );
 }
 
-// ═══ REUSABLE STAT CARD ═══
+// ═══ RESULT DISPLAY COMPONENTS ═══
 
-function StatCard({ label, value, color }: { label: string; value: string; color: string }) {
+function ResultDisplay({ data, color }: { data: Record<string, unknown>; color: string }) {
     return (
-        <div style={{ padding: '14px 16px', background: `${color}08`, border: `1px solid ${color}22`, borderRadius: '12px' }}>
-            <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 700, color }}>{value}</div>
+        <div style={resultBoxStyle(color)}>
+            <pre style={{ fontSize: '0.6875rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0, fontFamily: 'monospace', lineHeight: 1.5 }}>
+                {JSON.stringify(data, null, 2)}
+            </pre>
+        </div>
+    );
+}
+
+function DocumentResult({ data }: { data: Record<string, unknown> }) {
+    const content = (data as { content?: string }).content || '';
+    const status = (data as { status?: string }).status || '';
+    return (
+        <div style={resultBoxStyle('#F97316')}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'white' }}>{(data as { title?: string }).title || 'Document'}</span>
+                <span style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '0.625rem', fontWeight: 700, background: status === 'GP_APPROVED' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)', color: status === 'GP_APPROVED' ? '#22C55E' : '#F59E0B' }}>{status.replace(/_/g, ' ')}</span>
+            </div>
+            <div style={{ padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.7, whiteSpace: 'pre-wrap', fontFamily: 'serif' }}>
+                {content}
+            </div>
         </div>
     );
 }

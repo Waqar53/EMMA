@@ -1,0 +1,25 @@
+[
+  {
+    "id": "95f1f41f-67e6-4615-b019-245557a65895",
+    "taskDescription": "SUBMIT A 2 WEEK REFERAL FOR CANCER",
+    "domain": "spine.nhs.uk",
+    "targetUrl": "https://spine.nhs.uk",
+    "actions": [
+      {
+        "id": "act-501636fc",
+        "actionType": "navigate",
+        "target": "https://spine.nhs.uk",
+        "reasoning": "Fallback navigation to target domain",
+        "timestamp": "2026-02-26T21:49:45.745Z",
+        "success": false
+      }
+    ],
+    "status": "completed",
+    "securityFlags": [],
+    "auditTrail": [
+      "Session created: SUBMIT A 2 WEEK REFERAL FOR CANCER"
+    ],
+    "startedAt": "2026-02-26T21:49:45.745Z",
+    "completedAt": "2026-02-26T21:49:45.745Z"
+  }
+]

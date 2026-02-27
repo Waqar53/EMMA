@@ -1,0 +1,138 @@
+{
+  "campaigns": [
+    {
+      "id": "f450a117-e341-4103-ae7d-495ce7a8f27c",
+      "name": "Overdue Annual Review",
+      "ruleId": "rule-001",
+      "status": "active",
+      "targetCount": 5,
+      "sentCount": 5,
+      "respondedCount": 0,
+      "bookedCount": 0,
+      "createdAt": "2026-02-26T21:38:50.877Z"
+    },
+    {
+      "id": "d8d10870-3565-4faa-9917-012416e88498",
+      "name": "Overdue Annual Review",
+      "ruleId": "rule-001",
+      "status": "active",
+      "targetCount": 5,
+      "sentCount": 5,
+      "respondedCount": 0,
+      "bookedCount": 0,
+      "createdAt": "2026-02-26T21:49:01.235Z"
+    }
+  ],
+  "contacts": [
+    {
+      "id": "eb5c3631-1cd3-435a-8274-798b1a806171",
+      "campaignId": "f450a117-e341-4103-ae7d-495ce7a8f27c",
+      "patientNHSNumber": "943 476 5919",
+      "patientName": "Emily J. Wilson",
+      "channel": "sms",
+      "message": "Hi Emily, it's been over a year since your last diabetic review. Please book your annual review online at riverside.gp-booking.nhs.uk or call 0121 456 7890 to arrange an appointment.",
+      "status": "sent",
+      "sentAt": "2026-02-26T21:38:44.109Z",
+      "rule": "Overdue Annual Review"
+    },
+    {
+      "id": "766524c7-aac3-480b-8aff-e1cf1b906932",
+      "campaignId": "f450a117-e341-4103-ae7d-495ce7a8f27c",
+      "patientNHSNumber": "821 193 6582",
+      "patientName": "David L. Thompson",
+      "channel": "sms",
+      "message": "Hi David, we're reminding you that it's time for your flu vaccination. As you're 65+, you're eligible for a free jab. Please book online at riverside.gp-booking.nhs.uk or call 0121 456 7890 to protect yourself this season.",
+      "status": "sent",
+      "sentAt": "2026-02-26T21:38:44.709Z",
+      "rule": "Flu Vaccination Campaign"
+    },
+    {
+      "id": "0a443146-25ed-4f92-bab0-7ec367d9f8fe",
+      "campaignId": "f450a117-e341-4103-ae7d-495ce7a8f27c",
+      "patientNHSNumber": "467 382 9517",
+      "patientName": "Sarah K. Lee",
+      "channel": "sms",
+      "message": "Hi Sarah, it's time for your cervical screening. You're overdue, having last had a test 5 years ago. Please book online at riverside.gp-booking.nhs.uk or call 0121 456 7890 to arrange an appointment.",
+      "status": "sent",
+      "sentAt": "2026-02-26T21:38:45.468Z",
+      "rule": "Cervical Screening Reminder"
+    },
+    {
+      "id": "d2f6acb6-e032-4159-9fd0-76e81b1a62c0",
+      "campaignId": "f450a117-e341-4103-ae7d-495ce7a8f27c",
+      "patientNHSNumber": "119 827 4635",
+      "patientName": "James D. Patel",
+      "channel": "sms",
+      "message": "Hi James, sorry we missed you on 20/02. Please book a new DNA follow-up appointment online at riverside.gp-booking.nhs.uk or call 0121 456 7890.",
+      "status": "sent",
+      "sentAt": "2026-02-26T21:38:46.709Z",
+      "rule": "DNA Follow-up"
+    },
+    {
+      "id": "4f4c188e-3b54-4236-ab9c-f0c23c6311cb",
+      "campaignId": "f450a117-e341-4103-ae7d-495ce7a8f27c",
+      "patientNHSNumber": "753 194 2861",
+      "patientName": "Olivia M. Brown",
+      "channel": "sms",
+      "message": "Hi Olivia, it's time for your 6-month medication review. Please book online at riverside.gp-booking.nhs.uk or call 0121 456 7890 to arrange an appointment.",
+      "status": "sent",
+      "sentAt": "2026-02-26T21:38:50.876Z",
+      "rule": "Medication Review"
+    },
+    {
+      "id": "490101bd-cd89-439e-915c-8d00e5ea5a4c",
+      "campaignId": "d8d10870-3565-4faa-9917-012416e88498",
+      "patientNHSNumber": "943 476 5919",
+      "patientName": "Emily Wilson",
+      "channel": "sms",
+      "message": "Hi Emily, it's been over a year since your last diabetic review. We'd like to schedule an update to ensure your care is on track. Please book online at riverside.gp-booking.nhs.uk or call 0121 456 7890.",
+      "status": "sent",
+      "sentAt": "2026-02-26T21:48:59.905Z",
+      "rule": "Overdue Annual Review"
+    },
+    {
+      "id": "d418ab12-8d8a-4cfe-860b-00b586596fd5",
+      "campaignId": "d8d10870-3565-4faa-9917-012416e88498",
+      "patientNHSNumber": "821 398 2765",
+      "patientName": "David Lee",
+      "channel": "sms",
+      "message": "Hi David, it's time for your cervical screening. You can book online at riverside.gp-booking.nhs.uk or call 0121 456 7890.",
+      "status": "sent",
+      "sentAt": "2026-02-26T21:49:00.125Z",
+      "rule": "Cervical Screening Reminder"
+    },
+    {
+      "id": "021cd5ec-97a7-42f9-9f2f-cddf6cbf353a",
+      "campaignId": "d8d10870-3565-4faa-9917-012416e88498",
+      "patientNHSNumber": "467 239 8123",
+      "patientName": "Sarah Taylor",
+      "channel": "sms",
+      "message": "Hi Sarah, we're concerned you missed your appointment on 20/02. Please book a follow-up for your hypertension management online at riverside.gp-booking.nhs.uk or call 0121 456 7890.",
+      "status": "sent",
+      "sentAt": "2026-02-26T21:49:00.621Z",
+      "rule": "DNA Follow-up"
+    },
+    {
+      "id": "f5c092f5-1200-4ed0-9c99-40b86d3c7926",
+      "campaignId": "d8d10870-3565-4faa-9917-012416e88498",
+      "patientNHSNumber": "135 798 4632",
+      "patientName": "James Davis",
+      "channel": "sms",
+      "message": "Hi James, as you're over 65, we recommend a flu vaccination. Please book online at riverside.gp-booking.nhs.uk or call 0121 456 7890 to protect yourself this season.",
+      "status": "sent",
+      "sentAt": "2026-02-26T21:49:00.889Z",
+      "rule": "Flu Vaccination Campaign"
+    },
+    {
+      "id": "a07452a1-e937-4c1f-a19f-46e43b32800f",
+      "campaignId": "d8d10870-3565-4faa-9917-012416e88498",
+      "patientNHSNumber": "628 351 9478",
+      "patientName": "Olivia Brown",
+      "channel": "sms",
+      "message": "Hi Olivia, it's time for your 6-month medication review for your asthma. Please book online at riverside.gp-booking.nhs.uk or call 0121 456 7890 to arrange an appointment.",
+      "status": "sent",
+      "sentAt": "2026-02-26T21:49:01.235Z",
+      "rule": "Medication Review"
+    }
+  ]
+}

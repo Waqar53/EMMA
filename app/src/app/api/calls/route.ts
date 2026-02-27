@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { calls } from '@/lib/data/store';
+import { getCalls } from '@/lib/data/store';
 
 export async function GET() {
+    const calls = await getCalls();
     return NextResponse.json(calls);
 }

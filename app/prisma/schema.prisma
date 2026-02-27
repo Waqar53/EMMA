@@ -1,0 +1,333 @@
+// Prisma schema for EMMA — Real Database Backend
+// All patient data, engine outputs, and system records
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ═══ CORE MODELS ═══
+
+model Practice {
+  id             String @id @default(uuid())
+  name           String
+  odsCode        String @unique
+  address        String
+  phone          String
+  location       String
+  clinicalSystem String @default("emis")
+  hours          String // JSON
+  oohNumber      String @default("111")
+  pharmacyName   String @default("")
+  pharmacyPhone  String @default("")
+  pharmacyAddr   String @default("")
+  rxTurnaround   Int    @default(2)
+  fitNoteDays    Int    @default(3)
+  faqs           String @default("[]")  // JSON
+  testRules      String @default("{}") // JSON
+  triageProtos   String @default("{}") // JSON
+  clinicianTypes String @default("[]") // JSON
+  safeguardLead  String @default("")
+  createdAt      DateTime @default(now())
+}
+
+model Patient {
+  id              String   @id @default(uuid())
+  nhsNumber       String   @unique
+  firstName       String
+  lastName        String
+  dateOfBirth     String
+  gender          String
+  postcode        String
+  phone           String
+  practiceId      String
+  medications     String   @default("[]")  // JSON array of MedicationItem
+  allergies       String   @default("[]")  // JSON array of strings
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  appointments    Appointment[]
+  calls           CallRecord[]
+  prescriptions   Prescription[]
+  testResults     TestResult[]
+  triageRecords   TriageRecord[]
+  memoryFacts     MemoryFact[]
+  healthReadings  HealthReading[]
+  healthAlerts    HealthAlert[]
+  documents       ClinicalDocument[]
+  outreachContacts OutreachContact[]
+}
+
+model Appointment {
+  id            String  @id @default(uuid())
+  date          String
+  time          String
+  endTime       String
+  clinicianName String
+  clinicianType String
+  location      String
+  available     Boolean @default(true)
+  slotType      String  @default("routine")
+  patientId     String?
+  patient       Patient? @relation(fields: [patientId], references: [id])
+  bookedReason  String?
+  createdAt     DateTime @default(now())
+}
+
+model CallRecord {
+  id               String   @id @default(uuid())
+  practiceId       String
+  patientId        String?
+  patient          Patient? @relation(fields: [patientId], references: [id])
+  patientName      String?
+  patientNHSNumber String?
+  callerPhone      String?
+  startedAt        String
+  endedAt          String?
+  durationSeconds  Int?
+  primaryIntent    String?
+  urgencyLevel     String?
+  resolutionType   String   @default("pending")
+  agentUsed        String   @default("orchestrator")
+  actionsTaken     String   @default("[]")  // JSON
+  transcript       String   @default("[]")  // JSON
+  satisfaction     Int?
+  snomedCodes      String   @default("[]")  // JSON
+  redFlagsDetected String   @default("[]")  // JSON
+  safetyNetting    String?
+  createdAt        DateTime @default(now())
+}
+
+model Prescription {
+  id               String   @id @default(uuid())
+  patientId        String
+  patient          Patient  @relation(fields: [patientId], references: [id])
+  patientName      String
+  patientNHSNumber String
+  medications      String   @default("[]")  // JSON
+  status           String   @default("pending")
+  requestedAt      String
+  pharmacy         String
+  createdAt        DateTime @default(now())
+}
+
+model TestResult {
+  id               String   @id @default(uuid())
+  patientId        String
+  patient          Patient  @relation(fields: [patientId], references: [id])
+  patientNHSNumber String
+  testType         String
+  date             String
+  status           String   @default("pending")
+  deliveryTier     String   @default("emma_can_deliver")
+  summary          String?
+  reviewedBy       String?
+  createdAt        DateTime @default(now())
+}
+
+model TriageRecord {
+  id                   String   @id @default(uuid())
+  callId               String
+  patientId            String
+  patient              Patient  @relation(fields: [patientId], references: [id])
+  patientName          String
+  symptoms             String   @default("[]")  // JSON
+  redFlagsDetected     String   @default("[]")  // JSON
+  urgencyClassification String
+  safetyNetting        String
+  disposition          String
+  clinicalProtocol     String?
+  safetyCheckPassed    Boolean  @default(true)
+  humanReviewRequired  Boolean  @default(false)
+  createdAt            DateTime @default(now())
+}
+
+model AuditLog {
+  id               String   @id @default(uuid())
+  eventType        String
+  severity         String   @default("INFO")
+  callId           String?
+  practiceId       String
+  patientNHSNumber String?
+  agentName        String?
+  action           String
+  details          String?  // JSON
+  result           String   @default("SUCCESS")
+  createdAt        DateTime @default(now())
+}
+
+// ═══ SUPERPOWER MODELS ═══
+
+// SP3 — Memory
+model MemoryFact {
+  id               String   @id @default(uuid())
+  patientId        String
+  patient          Patient  @relation(fields: [patientId], references: [id])
+  patientNHSNumber String
+  layer            String   @default("episodic")
+  category         String   @default("preference")
+  fact             String
+  confidence       Float    @default(0.8)
+  source           String   @default("ai_extraction")
+  extractedAt      String
+  lastAccessedAt   String
+  accessCount      Int      @default(0)
+  createdAt        DateTime @default(now())
+}
+
+// SP8 — Health
+model HealthReading {
+  id               String   @id @default(uuid())
+  patientId        String
+  patient          Patient  @relation(fields: [patientId], references: [id])
+  patientNHSNumber String
+  type             String
+  value            Float
+  unit             String
+  source           String   @default("command_centre")
+  timestamp        String
+  normalRangeLow   Float?
+  normalRangeHigh  Float?
+  metadata         String?  // JSON
+  createdAt        DateTime @default(now())
+
+  alerts           AlertReading[]
+}
+
+model HealthAlert {
+  id                   String   @id @default(uuid())
+  patientId            String
+  patient              Patient  @relation(fields: [patientId], references: [id])
+  patientNHSNumber     String
+  patientName          String
+  tier                 String
+  type                 String
+  description          String
+  context              String
+  recommendedAction    String
+  autoResponseTriggered Boolean @default(false)
+  acknowledgedAt       String?
+  acknowledgedBy       String?
+  createdAt            DateTime @default(now())
+
+  readings             AlertReading[]
+}
+
+model AlertReading {
+  alertId   String
+  alert     HealthAlert   @relation(fields: [alertId], references: [id])
+  readingId String
+  reading   HealthReading @relation(fields: [readingId], references: [id])
+
+  @@id([alertId, readingId])
+}
+
+// SP7 — Documents
+model ClinicalDocument {
+  id                     String   @id @default(uuid())
+  type                   String
+  patientId              String
+  patient                Patient  @relation(fields: [patientId], references: [id])
+  patientNHSNumber       String
+  patientName            String
+  title                  String
+  content                String
+  status                 String   @default("AWAITING_GP_REVIEW")
+  gpApprovalRequired     Boolean  @default(true)
+  templateUsed           String?
+  snomedCodes            String   @default("[]")  // JSON
+  niceGuidelines         String   @default("[]")  // JSON
+  version                Int      @default(1)
+  previousVersions       String   @default("[]")  // JSON
+  reviewedBy             String?
+  reviewedAt             String?
+  approvedAt             String?
+  createdAt              DateTime @default(now())
+}
+
+// SP5 — Outreach
+model OutreachCampaign {
+  id             String   @id @default(uuid())
+  name           String
+  ruleId         String
+  status         String   @default("active")
+  targetCount    Int      @default(0)
+  sentCount      Int      @default(0)
+  respondedCount Int      @default(0)
+  bookedCount    Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  contacts       OutreachContact[]
+}
+
+model OutreachContact {
+  id               String   @id @default(uuid())
+  campaignId       String
+  campaign         OutreachCampaign @relation(fields: [campaignId], references: [id])
+  patientId        String?
+  patient          Patient? @relation(fields: [patientId], references: [id])
+  patientNHSNumber String
+  patientName      String
+  channel          String   @default("sms")
+  message          String
+  status           String   @default("pending")
+  sentAt           String?
+  rule             String?
+  createdAt        DateTime @default(now())
+}
+
+// SP4 — Self-Improve
+model SafetyTestResult {
+  id              String   @id @default(uuid())
+  testId          String
+  passed          Boolean
+  aiResponse      String
+  judgeReasoning  String
+  createdAt       DateTime @default(now())
+}
+
+// SP2 — Browser
+model BrowserSession {
+  id              String   @id @default(uuid())
+  taskDescription String
+  targetUrl       String
+  domain          String
+  status          String   @default("completed")
+  actions         String   @default("[]")  // JSON
+  securityFlags   String   @default("[]")  // JSON
+  auditTrail      String   @default("[]")  // JSON
+  startedAt       String
+  completedAt     String?
+  createdAt       DateTime @default(now())
+}
+
+// SP6 — Schedule
+model ScheduleOptimization {
+  id               String   @id @default(uuid())
+  date             String
+  totalSlots       Int
+  optimizedSlots   Int
+  gapsFilled       Int      @default(0)
+  predictedDNAs    Int      @default(0)
+  optimizationScore Int     @default(0)
+  avgFillTime      Float    @default(0)
+  actions          String   @default("[]")  // JSON
+  createdAt        DateTime @default(now())
+}
+
+model DNAPrediction {
+  id               String   @id @default(uuid())
+  optimizationId   String?
+  slotTime         String
+  slotDate         String
+  patientName      String
+  patientNHSNumber String
+  clinicianName    String
+  dnaProbability   Float
+  riskFactors      String   @default("[]")  // JSON
+  recommendation   String   @default("standard")
+  createdAt        DateTime @default(now())
+}

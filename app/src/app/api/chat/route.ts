@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processMessage } from '@/lib/agents/orchestrator';
+import { persistChatToDB } from '@/lib/agents/persist';
 import { ConversationState } from '@/lib/types';
 
 export async function POST(request: NextRequest) {
@@ -12,6 +13,12 @@ export async function POST(request: NextRequest) {
         }
 
         const result = await processMessage(message, conversationState);
+
+        // ── Persist to database ──
+        // Fire-and-forget: don't block the response on DB write
+        persistChatToDB(result.state, result.message).catch(err =>
+            console.error('Chat persistence error:', err)
+        );
 
         return NextResponse.json({
             response: result.message,

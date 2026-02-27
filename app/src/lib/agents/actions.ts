@@ -4,14 +4,14 @@
 // looks up test results, verifies patients, handles admin
 // ═══════════════════════════════════════════════════════════
 
-import { practice, patients, appointments, prescriptions, testResults } from '../data/store';
-import { ConversationState, PatientRecord, ActionPerformed, AppointmentSlot } from '../types';
+import prisma from '@/lib/db';
+import { ConversationState, PatientRecord, ActionPerformed, AppointmentSlot, PracticeConfig, PrescriptionRequest, TestResult } from '../types';
 
 // ─────────────────────────────────────────
 // PATIENT LOOKUP & VERIFICATION
 // ─────────────────────────────────────────
 
-export function findPatientByName(name: string): PatientRecord | null {
+export function findPatientByName(name: string, patients: PatientRecord[]): PatientRecord | null {
     const n = name.toLowerCase().trim();
     return patients.find(p =>
         `${p.firstName} ${p.lastName}`.toLowerCase() === n ||
@@ -21,13 +21,13 @@ export function findPatientByName(name: string): PatientRecord | null {
     ) || null;
 }
 
-export function findPatientByNHS(nhs: string): PatientRecord | null {
+export function findPatientByNHS(nhs: string, patients: PatientRecord[]): PatientRecord | null {
     const clean = nhs.replace(/\s+/g, '');
     return patients.find(p => p.nhsNumber.replace(/\s+/g, '') === clean) || null;
 }
 
-export function findPatientByDOB(name: string, dob: string): PatientRecord | null {
-    const p = findPatientByName(name);
+export function findPatientByDOB(name: string, dob: string, patients: PatientRecord[]): PatientRecord | null {
+    const p = findPatientByName(name, patients);
     if (!p) return null;
     // Parse various date formats
     const normalize = (d: string) => {
@@ -55,7 +55,7 @@ export function getPatientSummary(p: PatientRecord): string {
 // APPOINTMENT BOOKING
 // ─────────────────────────────────────────
 
-export function getAvailableSlots(type?: string, clinicianType?: string): AppointmentSlot[] {
+export function getAvailableSlots(appointments: AppointmentSlot[], type?: string, clinicianType?: string): AppointmentSlot[] {
     return appointments.filter(s => {
         if (!s.available) return false;
         if (type && s.slotType !== type) return false;
@@ -64,12 +64,12 @@ export function getAvailableSlots(type?: string, clinicianType?: string): Appoin
     });
 }
 
-export function getNextAvailableSlot(type?: string): AppointmentSlot | null {
-    const slots = getAvailableSlots(type);
+export function getNextAvailableSlot(appointments: AppointmentSlot[], type?: string): AppointmentSlot | null {
+    const slots = getAvailableSlots(appointments, type);
     return slots.length > 0 ? slots[0] : null;
 }
 
-export function bookAppointment(slotId: string, patientName: string): { success: boolean; slot?: AppointmentSlot; error?: string } {
+export function bookAppointment(slotId: string, patientName: string, appointments: AppointmentSlot[]): { success: boolean; slot?: AppointmentSlot; error?: string } {
     const slot = appointments.find(s => s.id === slotId);
     if (!slot) return { success: false, error: 'Slot not found' };
     if (!slot.available) return { success: false, error: 'Slot is no longer available' };
@@ -99,25 +99,26 @@ export function formatSlotsForDisplay(slots: AppointmentSlot[]): string {
 // PRESCRIPTION PROCESSING
 // ─────────────────────────────────────────
 
-export function getPatientMedications(nhsNumber: string): { name: string; dose: string; frequency: string; onRepeat: boolean }[] {
-    const patient = findPatientByNHS(nhsNumber);
+export function getPatientMedications(nhsNumber: string, patients: PatientRecord[]): { name: string; dose: string; frequency: string; onRepeat: boolean }[] {
+    const patient = findPatientByNHS(nhsNumber, patients);
     if (!patient) return [];
     return patient.medications.map(m => ({ name: m.name, dose: m.dose, frequency: m.frequency, onRepeat: m.onRepeatList }));
 }
 
-export function submitRepeatPrescription(
+export async function submitRepeatPrescription(
     patientName: string,
     nhsNumber: string,
-    medicationNames: string[]
-): { success: boolean; prescription?: { id: string; medications: string[]; pharmacy: string; readyBy: string }; error?: string } {
-    const patient = findPatientByNHS(nhsNumber);
+    medicationNames: string[],
+    patients: PatientRecord[],
+    practice: PracticeConfig
+): Promise<{ success: boolean; prescription?: { id: string; medications: string[]; pharmacy: string; readyBy: string }; error?: string }> {
+    const patient = findPatientByNHS(nhsNumber, patients);
     if (!patient) return { success: false, error: 'Patient not found in our records.' };
 
-    // Validate all requested meds are on repeat list
     const validMeds = patient.medications.filter(m => m.onRepeatList);
     const requested = medicationNames.length > 0
         ? validMeds.filter(m => medicationNames.some(n => m.name.toLowerCase().includes(n.toLowerCase())))
-        : validMeds; // If no specific meds mentioned, order all repeat meds
+        : validMeds;
 
     if (requested.length === 0) {
         return { success: false, error: `None of the requested medications are on your repeat prescription list. Your repeat medications are: ${validMeds.map(m => m.name).join(', ')}` };
@@ -129,16 +130,22 @@ export function submitRepeatPrescription(
 
     const rxId = `rx-${Date.now()}`;
 
-    // Add to prescriptions store
-    prescriptions.push({
-        id: rxId,
-        patientName,
-        patientNHSNumber: nhsNumber,
-        medications: requested.map(m => ({ ...m })),
-        status: 'pending',
-        requestedAt: new Date().toISOString(),
-        pharmacy: practice.pharmacyName,
-    });
+    // Persist to DB
+    try {
+        await prisma.prescription.create({
+            data: {
+                id: rxId,
+                patientName,
+                patientNHSNumber: nhsNumber,
+                medications: JSON.stringify(requested.map(m => ({ name: m.name, dose: m.dose, frequency: m.frequency }))),
+                status: 'pending',
+                requestedAt: new Date().toISOString(),
+                pharmacy: practice.pharmacyName,
+            },
+        });
+    } catch (e) {
+        console.error('Failed to save prescription to DB:', e);
+    }
 
     return {
         success: true,
@@ -155,7 +162,7 @@ export function submitRepeatPrescription(
 // TEST RESULTS LOOKUP
 // ─────────────────────────────────────────
 
-export function getTestResults(nhsNumber: string): {
+export function getTestResults(nhsNumber: string, testResults: TestResult[]): {
     results: { testType: string; date: string; status: string; summary?: string; canDeliver: boolean; deliveryTier: string }[];
     pending: string[];
 } {
@@ -173,8 +180,8 @@ export function getTestResults(nhsNumber: string): {
     };
 }
 
-export function formatTestResultsForPatient(nhsNumber: string): string {
-    const { results, pending } = getTestResults(nhsNumber);
+export function formatTestResultsForPatient(nhsNumber: string, testResults: TestResult[]): string {
+    const { results, pending } = getTestResults(nhsNumber, testResults);
     if (results.length === 0 && pending.length === 0) {
         return 'No test results on file.';
     }
@@ -202,7 +209,7 @@ export function formatTestResultsForPatient(nhsNumber: string): string {
 // ADMIN QUERIES
 // ─────────────────────────────────────────
 
-export function answerAdminQuery(query: string): string {
+export function answerAdminQuery(query: string, practice: PracticeConfig, appointments: AppointmentSlot[]): string {
     const q = query.toLowerCase();
 
     // Opening hours
@@ -254,7 +261,7 @@ export function answerAdminQuery(query: string): string {
 
     // GP / doctor names
     if (q.includes('doctor') || q.includes('gp') || q.includes('clinician') || q.includes('staff')) {
-        const clinicians = [...new Set(appointments.map(a => `${a.clinicianName} (${a.clinicianType})`))];
+        const clinicians = [...new Set(appointments.map((a: AppointmentSlot) => `${a.clinicianName} (${a.clinicianType})`))];
         return `Our clinical team includes:\n${clinicians.map(c => `• ${c}`).join('\n')}`;
     }
 
@@ -279,7 +286,14 @@ export interface ActionResult {
     dataForSidebar: Record<string, unknown>;
 }
 
-export function executeActions(state: ConversationState, userMessage: string): ActionResult {
+export function executeActions(
+    state: ConversationState,
+    userMessage: string,
+    practice: PracticeConfig,
+    patients: PatientRecord[],
+    appointments: AppointmentSlot[],
+    testResultsList: TestResult[]
+): ActionResult {
     const actions: ActionPerformed[] = [];
     let contextForLLM = '';
     const dataForSidebar: Record<string, unknown> = {};
@@ -288,11 +302,11 @@ export function executeActions(state: ConversationState, userMessage: string): A
     // ── 1. Patient Verification ──
     if (!state.patientVerified) {
         // Try to extract name + DOB from message
-        const nameMatch = extractNameFromMessage(userMessage);
+        const nameMatch = extractNameFromMessage(userMessage, patients);
         const dobMatch = extractDOBFromMessage(userMessage);
 
         if (nameMatch && dobMatch) {
-            const patient = findPatientByDOB(nameMatch, dobMatch);
+            const patient = findPatientByDOB(nameMatch, dobMatch, patients);
             if (patient) {
                 state.patientVerified = true;
                 state.patientName = `${patient.firstName} ${patient.lastName}`;
@@ -304,7 +318,7 @@ export function executeActions(state: ConversationState, userMessage: string): A
                 dataForSidebar.patientName = `${patient.firstName} ${patient.lastName}`;
             }
         } else if (nameMatch) {
-            const patient = findPatientByName(nameMatch);
+            const patient = findPatientByName(nameMatch, patients);
             if (patient) {
                 contextForLLM += `\n[SYSTEM: Name "${nameMatch}" matches patient ${patient.firstName} ${patient.lastName}. Ask for date of birth to verify identity.]\n`;
             }
@@ -313,7 +327,7 @@ export function executeActions(state: ConversationState, userMessage: string): A
         // Try NHS number
         const nhsMatch = userMessage.match(/\d{3}\s?\d{3}\s?\d{4}/);
         if (nhsMatch) {
-            const patient = findPatientByNHS(nhsMatch[0]);
+            const patient = findPatientByNHS(nhsMatch[0], patients);
             if (patient) {
                 state.patientVerified = true;
                 state.patientName = `${patient.firstName} ${patient.lastName}`;
@@ -328,13 +342,13 @@ export function executeActions(state: ConversationState, userMessage: string): A
 
     // ── 2. Appointment Booking ──
     if (state.currentIntent === 'APPOINTMENT' || msg.includes('appointment') || msg.includes('book') || msg.includes('see a doctor') || msg.includes('see the gp')) {
-        const available = getAvailableSlots();
+        const available = getAvailableSlots(appointments);
         if (available.length > 0) {
             // Check if user is confirming a booking
             if ((msg.includes('yes') || msg.includes('that') || msg.includes('book') || msg.includes('please') || msg.includes('confirm') || msg.includes('sounds good') || msg.includes('perfect')) && state.actionsTaken.some(a => a.type === 'slots_offered')) {
                 // Book the first offered slot
                 const slot = available[0];
-                const result = bookAppointment(slot.id, state.patientName || 'Patient');
+                const result = bookAppointment(slot.id, state.patientName || 'Patient', appointments);
                 if (result.success && result.slot) {
                     actions.push({
                         type: 'appointment_booked',
@@ -359,29 +373,46 @@ export function executeActions(state: ConversationState, userMessage: string): A
     // ── 3. Repeat Prescription ──
     if (state.currentIntent === 'PRESCRIPTION' || msg.includes('prescription') || msg.includes('medication') || msg.includes('repeat') || msg.includes('medicine') || msg.includes('pills')) {
         if (state.patientVerified && state.patientNHSNumber) {
-            const meds = getPatientMedications(state.patientNHSNumber);
+            const meds = getPatientMedications(state.patientNHSNumber, patients);
             const repeatMeds = meds.filter(m => m.onRepeat);
 
             if (repeatMeds.length > 0) {
-                // Check if user wants to order
                 if (msg.includes('order') || msg.includes('need') || msg.includes('please') || msg.includes('repeat') || msg.includes('refill') || msg.includes('yes') || msg.includes('all')) {
-                    // Extract specific med names or order all
                     const specificMeds = repeatMeds.filter(m => msg.includes(m.name.toLowerCase())).map(m => m.name);
-                    const result = submitRepeatPrescription(state.patientName || '', state.patientNHSNumber, specificMeds);
+                    // submitRepeatPrescription is now async — fire-and-forget write to DB, but get result synchronously for LLM context
+                    const validMeds = patients.find(p => p.nhsNumber === state.patientNHSNumber)?.medications.filter(m => m.onRepeatList) || [];
+                    const requested = specificMeds.length > 0
+                        ? validMeds.filter(m => specificMeds.some(n => m.name.toLowerCase().includes(n.toLowerCase())))
+                        : validMeds;
+                    const readyDate = new Date();
+                    readyDate.setDate(readyDate.getDate() + practice.prescriptionTurnaroundDays);
+                    const readyBy = readyDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+                    const rxId = `rx-${Date.now()}`;
+                    if (requested.length > 0) {
+                        // Write to DB async
+                        prisma.prescription.create({
+                            data: {
+                                id: rxId,
+                                patientName: state.patientName || '',
+                                patientNHSNumber: state.patientNHSNumber,
+                                medications: JSON.stringify(requested.map(m => ({ name: m.name, dose: m.dose, frequency: m.frequency }))),
+                                status: 'pending',
+                                requestedAt: new Date().toISOString(),
+                                pharmacy: practice.pharmacyName,
+                            },
+                        }).catch((e: unknown) => console.error('Rx DB write failed:', e));
 
-                    if (result.success && result.prescription) {
                         actions.push({
                             type: 'prescription_submitted',
-                            description: `Repeat prescription submitted: ${result.prescription.medications.join(', ')}`,
-                            details: { rxId: result.prescription.id, medications: result.prescription.medications, pharmacy: result.prescription.pharmacy, readyBy: result.prescription.readyBy },
+                            description: `Repeat prescription submitted: ${requested.map(m => m.name).join(', ')}`,
+                            details: { rxId, medications: requested.map(m => `${m.name} ${m.dose}`), pharmacy: `${practice.pharmacyName} (${practice.pharmacyAddress})`, readyBy },
                         });
-                        contextForLLM += `\n[SYSTEM: PRESCRIPTION SUCCESSFULLY SUBMITTED. Confirmation:\n• Medications: ${result.prescription.medications.join(', ')}\n• Collection: ${result.prescription.pharmacy}\n• Ready by: ${result.prescription.readyBy}\nConfirm these details to the patient.]\n`;
-                        dataForSidebar.prescriptionSubmitted = result.prescription;
-                    } else if (result.error) {
-                        contextForLLM += `\n[SYSTEM: Prescription error — ${result.error}]\n`;
+                        contextForLLM += `\n[SYSTEM: PRESCRIPTION SUCCESSFULLY SUBMITTED. Confirmation:\n• Medications: ${requested.map(m => `${m.name} ${m.dose}`).join(', ')}\n• Collection: ${practice.pharmacyName} (${practice.pharmacyAddress})\n• Ready by: ${readyBy}\nConfirm these details to the patient.]\n`;
+                        dataForSidebar.prescriptionSubmitted = { id: rxId, medications: requested.map(m => `${m.name} ${m.dose}`), pharmacy: practice.pharmacyName, readyBy };
+                    } else {
+                        contextForLLM += `\n[SYSTEM: Prescription error — requested medications not on repeat list]\n`;
                     }
                 } else {
-                    // Show what's on repeat
                     contextForLLM += `\n[SYSTEM: Patient's repeat medications are:\n${repeatMeds.map(m => `• ${m.name} ${m.dose} (${m.frequency})`).join('\n')}\nAsk which medications they'd like to order, or if they want all of them.]\n`;
                     dataForSidebar.repeatMedications = repeatMeds;
                 }
@@ -394,8 +425,8 @@ export function executeActions(state: ConversationState, userMessage: string): A
     // ── 4. Test Results ──
     if (state.currentIntent === 'TEST_RESULTS' || msg.includes('test result') || msg.includes('blood test') || msg.includes('results') || msg.includes('blood')) {
         if (state.patientVerified && state.patientNHSNumber) {
-            const resultsText = formatTestResultsForPatient(state.patientNHSNumber);
-            const { results, pending } = getTestResults(state.patientNHSNumber);
+            const resultsText = formatTestResultsForPatient(state.patientNHSNumber, testResultsList);
+            const { results, pending } = getTestResults(state.patientNHSNumber, testResultsList);
 
             const deliverable = results.filter(r => r.canDeliver);
             const needsGP = results.filter(r => !r.canDeliver);
@@ -431,7 +462,7 @@ export function executeActions(state: ConversationState, userMessage: string): A
 
     // ── 5. Admin Queries ──
     if (state.currentIntent === 'ADMIN' || msg.includes('hours') || msg.includes('open') || msg.includes('register') || msg.includes('pharmacy') || msg.includes('address') || msg.includes('location') || msg.includes('sick note') || msg.includes('ear') || msg.includes('service')) {
-        const answer = answerAdminQuery(userMessage);
+        const answer = answerAdminQuery(userMessage, practice, appointments);
         actions.push({ type: 'info_provided', description: 'Practice information provided', details: { query: userMessage.slice(0, 50) } });
         contextForLLM += `\n[SYSTEM: Here is the answer to the patient's query:\n${answer}\nDeliver this information naturally and helpfully. Ask if they need anything else.]\n`;
         dataForSidebar.adminResponse = answer;
@@ -458,7 +489,7 @@ export function executeActions(state: ConversationState, userMessage: string): A
 // HELPERS
 // ─────────────────────────────────────────
 
-function extractNameFromMessage(msg: string): string | null {
+function extractNameFromMessage(msg: string, patients: PatientRecord[]): string | null {
     // Try "My name is X" / "I'm X" / "This is X"
     const patterns = [
         /(?:my name is|i'm|i am|this is|it's|name's)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,

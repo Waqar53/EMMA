@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { triageRecords } from '@/lib/data/store';
+import { getTriageRecords } from '@/lib/data/store';
 
 export async function GET() {
-    return NextResponse.json(triageRecords);
+    const triages = await getTriageRecords();
+    return NextResponse.json(triages);
 }

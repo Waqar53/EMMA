@@ -1,77 +1,140 @@
 'use client';
 
-import Link from 'next/link';
+import { useEffect, useState } from 'react';
 
-const QUEUE_ITEMS = [
-    { priority: 'RED FLAG', priorityClass: 'badge-red-flag', name: 'Johnathan Doe', age: '65 M', nhs: '483 291 0041', summary: 'AI detected <hl>chest pain</hl> & <hl>shortness of breath</hl>. Patient has history of hypertension. Recommended immediate transfer to clinical lead.', wait: '2m 14s', waitUrgent: true, action: '📞 Take Call', actionClass: 'btn-take-call' },
-    { priority: 'URGENT', priorityClass: 'badge-urgent', name: 'Jane Smith', age: '28 F', nhs: '993 002 8177', summary: 'Complex mental health medication interaction query. Patient reports mild dizziness but stable. Requires pharmacist review.', wait: '5m 45s', waitUrgent: false, action: '💬 Send SMS', actionClass: 'btn-send-sms' },
-    { priority: 'STANDARD', priorityClass: 'badge-standard', name: 'Robert Brown', age: '45 M', nhs: '112 884 0932', summary: 'Requesting sick note extension for chronic back pain. System verification failed for auto-approval. Manual check needed.', wait: '12m 10s', waitUrgent: false, action: '✏ Action', actionClass: 'btn' },
-];
+interface TriageRecord {
+    id: string;
+    callId: string;
+    patientName: string;
+    symptoms: { description: string; snomedCode?: string; severity: number; isRedFlag?: boolean }[];
+    redFlagsDetected: string[];
+    urgencyClassification: string;
+    safetyNettingApplied: string;
+    disposition: string;
+    clinicalProtocolUsed?: string;
+    safetyCheckPassed: boolean;
+    humanReviewRequired: boolean;
+    createdAt: string;
+}
+
+function urgencyBadge(urgency: string) {
+    const map: Record<string, { label: string; cls: string }> = {
+        EMERGENCY: { label: 'RED FLAG', cls: 'badge-red-flag' },
+        URGENT: { label: 'URGENT', cls: 'badge-urgent' },
+        SOON: { label: 'SOON', cls: 'badge-urgent' },
+        ROUTINE: { label: 'STANDARD', cls: 'badge-standard' },
+    };
+    return map[urgency] || { label: urgency, cls: 'badge-standard' };
+}
+
+function timeSince(iso: string) {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    return `${hours}h ${mins % 60}m ago`;
+}
 
 export default function TriagePage() {
+    const [records, setRecords] = useState<TriageRecord[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetch('/api/triage')
+            .then(r => r.json())
+            .then(data => { setRecords(data); setLoading(false); })
+            .catch(() => setLoading(false));
+    }, []);
+
+    const redFlagCount = records.filter(r => r.redFlagsDetected.length > 0).length;
+    const urgentCount = records.filter(r => r.urgencyClassification === 'URGENT' || r.urgencyClassification === 'EMERGENCY').length;
+
     return (
         <main className="page-content">
             <div className="page-header">
                 <div>
                     <div className="ph-live"><div className="dot" /> LIVE QUEUE</div>
                     <h1>Patient Triage Queue</h1>
-                    <p className="ph-desc">Real-time AI escalations requiring practice intervention</p>
+                    <p className="ph-desc">AI triage records from the database — real patient escalations</p>
                 </div>
                 <div className="ph-actions">
-                    <button className="btn">⏸ Pause Intake</button>
-                    <button className="btn btn-primary">🔄 Refresh Queue</button>
+                    <button className="btn" onClick={() => { setLoading(true); fetch('/api/triage').then(r => r.json()).then(data => { setRecords(data); setLoading(false); }); }}>🔄 Refresh Queue</button>
                 </div>
             </div>
 
-            {/* Tabs */}
+            {/* Tabs — real counts */}
             <div className="tabs">
-                <button className="tab active">All Escalations <span className="tab-count">12</span></button>
-                <button className="tab">High Priority <span className="tab-count">4</span></button>
-                <button className="tab">Red Flags <span className="tab-count red">2</span></button>
-                <button className="tab">Assigned to Me <span className="tab-count">3</span></button>
+                <button className="tab active">All Escalations <span className="tab-count">{records.length}</span></button>
+                <button className="tab">High Priority <span className="tab-count">{urgentCount}</span></button>
+                <button className="tab">Red Flags <span className="tab-count red">{redFlagCount}</span></button>
             </div>
 
             {/* Queue Table */}
             <div className="card">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>Priority</th>
-                            <th>Patient Details</th>
-                            <th>AI Summary &amp; Context</th>
-                            <th>Wait Time</th>
-                            <th>Direct Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {QUEUE_ITEMS.map((item, i) => (
-                            <tr key={i}>
-                                <td><span className={`badge ${item.priorityClass}`}>{item.priority}</span></td>
-                                <td>
-                                    <div className="patient-name">{item.name}</div>
-                                    <div className="patient-nhs">{item.age} • NHS: {item.nhs}</div>
-                                </td>
-                                <td>
-                                    <div style={{ fontSize: '0.8125rem', lineHeight: 1.6, color: 'var(--text-secondary)' }}>
-                                        <span style={{ color: 'var(--brand-blue)', marginRight: '6px' }}>🤖</span>
-                                        <span dangerouslySetInnerHTML={{ __html: item.summary.replace(/<hl>/g, '<span style="color:var(--red-500);font-weight:600;text-decoration:underline dotted">').replace(/<\/hl>/g, '</span>') }} />
-                                    </div>
-                                </td>
-                                <td>
-                                    <span className={`tr-wait ${item.waitUrgent ? 'urgent' : ''}`}>
-                                        {item.waitUrgent ? '⏱ ' : '⏱ '}{item.wait}
-                                    </span>
-                                </td>
-                                <td>
-                                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                        <button className={`btn btn-sm ${item.actionClass}`}>{item.action}</button>
-                                        <button className="btn btn-sm" style={{ padding: '4px 8px' }}>👁</button>
-                                    </div>
-                                </td>
+                {loading ? (
+                    <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        ⏳ Loading triage queue from database...
+                    </div>
+                ) : records.length === 0 ? (
+                    <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        No triage records in the database. Triage records are created when patients report clinical symptoms via AI Chat.
+                    </div>
+                ) : (
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>Priority</th>
+                                <th>Patient Details</th>
+                                <th>AI Summary &amp; Context</th>
+                                <th>Time</th>
+                                <th>Actions</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {records.map((rec) => {
+                                const badge = urgencyBadge(rec.urgencyClassification);
+                                const hasRedFlags = rec.redFlagsDetected.length > 0;
+                                return (
+                                    <tr key={rec.id}>
+                                        <td><span className={`badge ${badge.cls}`}>{badge.label}</span></td>
+                                        <td>
+                                            <div className="patient-name">{rec.patientName}</div>
+                                            <div className="patient-nhs">{rec.disposition}</div>
+                                        </td>
+                                        <td>
+                                            <div style={{ fontSize: '0.8125rem', lineHeight: 1.6, color: 'var(--text-secondary)' }}>
+                                                <span style={{ color: 'var(--brand-blue)', marginRight: '6px' }}>🤖</span>
+                                                <strong>Symptoms:</strong> {rec.symptoms.map(s => s.description).join(', ')}.
+                                                {hasRedFlags && (
+                                                    <span style={{ color: 'var(--red-500)', fontWeight: 600 }}> ⚠ Red flags: {rec.redFlagsDetected.join(', ')}</span>
+                                                )}
+                                                <br /><strong>Safety:</strong> {rec.safetyNettingApplied}
+                                                {rec.clinicalProtocolUsed && <><br /><strong>Protocol:</strong> {rec.clinicalProtocolUsed}</>}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span className={`tr-wait ${hasRedFlags ? 'urgent' : ''}`}>
+                                                ⏱ {timeSince(rec.createdAt)}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                {hasRedFlags ? (
+                                                    <button className="btn btn-sm btn-take-call">📞 Take Call</button>
+                                                ) : rec.humanReviewRequired ? (
+                                                    <button className="btn btn-sm btn-send-sms">📋 Review</button>
+                                                ) : (
+                                                    <button className="btn btn-sm">✏ Action</button>
+                                                )}
+                                                <button className="btn btn-sm" style={{ padding: '4px 8px' }}>👁</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                )}
             </div>
 
             {/* Helper Cards */}
@@ -86,8 +149,8 @@ export default function TriagePage() {
                 <div className="helper-card">
                     <div className="hc-icon green">✓</div>
                     <div>
-                        <h4>Pre-Verified</h4>
-                        <p>Patients are ID verified by AI before reaching the queue.</p>
+                        <h4>Database Backed</h4>
+                        <p>All triage records are stored in the Prisma database.</p>
                     </div>
                 </div>
                 <div className="helper-card">
@@ -101,7 +164,7 @@ export default function TriagePage() {
 
             <footer className="status-footer" style={{ marginTop: 'auto', marginBottom: 0 }}>
                 <div className="sf-item"><span className="sf-dot online" /> AI Core: Online</div>
-                <div className="sf-item"><span className="sf-dot online" /> NHS Spine Link: Connected</div>
+                <div className="sf-item"><span className="sf-dot online" /> Database: Connected</div>
                 <div className="sf-links">
                     <a href="#">Support</a>
                     <a href="#">System Health</a>
