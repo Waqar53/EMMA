@@ -717,7 +717,170 @@ const findNHSServices: CortexTool = {
 };
 
 // ═══════════════════════════════════════════════════════════
-// EXPORT ALL TOOLS
+// TOOL 15: send_sms
+// ═══════════════════════════════════════════════════════════
+
+const sendSMSTool: CortexTool = {
+    name: 'send_sms',
+    description: 'Send an SMS message to a patient or contact. Use for appointment confirmations, prescription ready notifications, recall campaigns, and safety follow-ups. Always use after booking or prescription actions.',
+    parameters: {
+        type: 'object',
+        properties: {
+            phone: { type: 'string', description: 'UK phone number (e.g. "07700900123" or "+447700900123")' },
+            message: { type: 'string', description: 'SMS message text. Keep under 160 chars. No markdown. Clear next step for recipient.' },
+        },
+        required: ['phone', 'message'],
+    },
+    async execute(params) {
+        const { sendSMS } = await import('../comms/twilio');
+        const result = await sendSMS(String(params.phone), String(params.message));
+        return {
+            success: result.success,
+            data: { messageId: result.messageId, to: result.to, channel: 'sms' },
+            observation: result.success
+                ? `✅ SMS sent to ${result.to}: "${params.message}"`
+                : `❌ SMS failed to ${result.to}: ${result.error}`,
+        };
+    }
+};
+
+// ═══════════════════════════════════════════════════════════
+// TOOL 16: send_whatsapp
+// ═══════════════════════════════════════════════════════════
+
+const sendWhatsAppTool: CortexTool = {
+    name: 'send_whatsapp',
+    description: 'Send a WhatsApp message to a patient. Use for appointment reminders, recall campaigns, and follow-up check-ins. Patients can reply to these messages.',
+    parameters: {
+        type: 'object',
+        properties: {
+            phone: { type: 'string', description: 'UK phone number' },
+            message: { type: 'string', description: 'WhatsApp message text. Plain text only, no markdown.' },
+        },
+        required: ['phone', 'message'],
+    },
+    async execute(params) {
+        const { sendWhatsApp } = await import('../comms/twilio');
+        const result = await sendWhatsApp(String(params.phone), String(params.message));
+        return {
+            success: result.success,
+            data: { messageId: result.messageId, to: result.to, channel: 'whatsapp' },
+            observation: result.success
+                ? `✅ WhatsApp sent to ${result.to}: "${params.message}"`
+                : `❌ WhatsApp failed to ${result.to}: ${result.error}`,
+        };
+    }
+};
+
+// ═══════════════════════════════════════════════════════════
+// TOOL 17: cancel_appointment
+// ═══════════════════════════════════════════════════════════
+
+const cancelAppointment: CortexTool = {
+    name: 'cancel_appointment',
+    description: 'Cancel a booked appointment. Marks it as cancelled in the database and optionally notifies the patient via SMS.',
+    parameters: {
+        type: 'object',
+        properties: {
+            appointment_id: { type: 'string', description: 'The appointment ID to cancel' },
+            reason: { type: 'string', description: 'Reason for cancellation' },
+            notify_patient: { type: 'boolean', description: 'Whether to send cancellation SMS to patient' },
+        },
+        required: ['appointment_id', 'reason'],
+    },
+    async execute(params, ctx) {
+        const id = String(params.appointment_id);
+        try {
+            const apt = await prisma.appointment.findUnique({ where: { id } });
+            if (!apt) return { success: false, data: {}, observation: 'Appointment not found.' };
+
+            await prisma.appointment.update({
+                where: { id },
+                data: { available: true, bookedReason: `CANCELLED: ${params.reason}` },
+            });
+
+            ctx.state.actionsTaken.push({
+                type: 'appointment_cancelled',
+                description: `Appointment ${id} cancelled: ${params.reason}`,
+                details: { appointmentId: id, reason: params.reason },
+            });
+
+            // Notify patient if requested
+            if (params.notify_patient && ctx.state.patientNHSNumber) {
+                const patient = await prisma.patient.findFirst({ where: { nhsNumber: ctx.state.patientNHSNumber } });
+                if (patient?.phone) {
+                    const { sendSMS } = await import('../comms/twilio');
+                    await sendSMS(patient.phone,
+                        `Your appointment on ${apt.date} at ${apt.time} has been cancelled. ` +
+                        `To rebook, call your surgery or chat with EMMA online.`
+                    );
+                }
+            }
+
+            return {
+                success: true,
+                data: { appointmentId: id },
+                observation: `✅ Appointment ${id} CANCELLED. Reason: ${params.reason}. Slot freed for other patients.`,
+            };
+        } catch (err) {
+            return { success: false, data: {}, observation: `Cancellation failed: ${err}` };
+        }
+    }
+};
+
+// ═══════════════════════════════════════════════════════════
+// TOOL 18: alert_emergency_contact
+// ═══════════════════════════════════════════════════════════
+
+const alertEmergencyContact: CortexTool = {
+    name: 'alert_emergency_contact',
+    description: 'CRITICAL SAFETY TOOL. Triggers the full emergency protocol: SMS to emergency contact, GP urgent flag, patient safety SMS, immutable audit log. Use when RED triage detected, patient reports chest pain + arm pain, stroke signs, anaphylaxis, suicidal ideation, or any life-threatening symptoms.',
+    parameters: {
+        type: 'object',
+        properties: {
+            patient_name: { type: 'string', description: 'Patient full name' },
+            nhs_number: { type: 'string', description: 'Patient NHS number' },
+            symptoms: { type: 'string', description: 'Symptom description' },
+            red_flags: { type: 'string', description: 'Comma-separated red flags detected' },
+        },
+        required: ['patient_name', 'symptoms', 'red_flags'],
+    },
+    async execute(params, ctx) {
+        const { executeEmergencyProtocol } = await import('../protocols/emergency');
+
+        const nhs = String(params.nhs_number || ctx.state.patientNHSNumber || '');
+        const patient = nhs ? await prisma.patient.findFirst({ where: { nhsNumber: nhs } }) : null;
+
+        const result = await executeEmergencyProtocol({
+            patientName: String(params.patient_name),
+            patientNHSNumber: nhs,
+            patientPhone: patient?.phone,
+            symptoms: String(params.symptoms),
+            redFlags: String(params.red_flags).split(',').map(f => f.trim()),
+            triageLevel: 'RED',
+            callId: ctx.state.callId,
+        });
+
+        ctx.state.escalationRequired = true;
+        ctx.state.urgencyLevel = 'EMERGENCY';
+        ctx.state.currentAgent = 'escalation';
+
+        return {
+            success: true,
+            data: {
+                emergencyContactAlerted: result.emergencyContactAlerted,
+                emergencyContactName: result.emergencyContactName,
+                gpFlagged: result.gpFlagged,
+                auditLogged: result.auditLogged,
+                ui_component: 'emergency_alert',
+            },
+            observation: `🚨 EMERGENCY PROTOCOL EXECUTED:\n${result.actions.map(a => `• ${a}`).join('\n')}\n\nTell the patient to CALL 999 IMMEDIATELY. Do not continue normal conversation.`,
+        };
+    }
+};
+
+// ═══════════════════════════════════════════════════════════
+// EXPORT ALL TOOLS (18 TOTAL)
 // ═══════════════════════════════════════════════════════════
 
 export function getAllTools(): CortexTool[] {
@@ -736,6 +899,10 @@ export function getAllTools(): CortexTool[] {
         lookupNHSPatient,
         validateNHSTool,
         findNHSServices,
+        sendSMSTool,
+        sendWhatsAppTool,
+        cancelAppointment,
+        alertEmergencyContact,
     ];
 }
 

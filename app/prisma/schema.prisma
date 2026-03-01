@@ -55,10 +55,13 @@ model Patient {
   testResults     TestResult[]
   triageRecords   TriageRecord[]
   memoryFacts     MemoryFact[]
-  healthReadings  HealthReading[]
-  healthAlerts    HealthAlert[]
-  documents       ClinicalDocument[]
-  outreachContacts OutreachContact[]
+  healthReadings     HealthReading[]
+  healthAlerts       HealthAlert[]
+  documents          ClinicalDocument[]
+  outreachContacts   OutreachContact[]
+  emergencyContacts  EmergencyContact[]
+  recallCampaigns    RecallCampaign[]
+  scheduledTasks     ScheduledTask[]
 }
 
 model Appointment {
@@ -330,4 +333,44 @@ model DNAPrediction {
   riskFactors      String   @default("[]")  // JSON
   recommendation   String   @default("standard")
   createdAt        DateTime @default(now())
+}
+
+// ═══ PHASE 2 MODELS — Emergency, Recall, Scheduler ═══
+
+model EmergencyContact {
+  id            String   @id @default(uuid())
+  patientId     String
+  patient       Patient  @relation(fields: [patientId], references: [id])
+  name          String
+  phone         String
+  relationship  String
+  isPrimary     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+model RecallCampaign {
+  id            String    @id @default(uuid())
+  patientId     String
+  patient       Patient   @relation(fields: [patientId], references: [id])
+  recallType    String    // smear|diabetic|copd|bp|medication_review|vaccination|nhs_health_check|post_discharge
+  dueDate       String
+  contactedAt   String?
+  channel       String?
+  responded     Boolean   @default(false)
+  booked        Boolean   @default(false)
+  appointmentId String?
+  createdAt     DateTime  @default(now())
+}
+
+model ScheduledTask {
+  id            String    @id @default(uuid())
+  taskType      String    // checkin|recall_sms|follow_up|reminder
+  patientId     String?
+  patient       Patient?  @relation(fields: [patientId], references: [id])
+  payload       String    @default("{}")  // JSON
+  executeAt     DateTime
+  executedAt    DateTime?
+  status        String    @default("pending") // pending|executed|failed|cancelled
+  result        String?
+  createdAt     DateTime  @default(now())
 }

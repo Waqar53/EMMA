@@ -7,9 +7,11 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import path from 'path';
+import 'dotenv/config';
 
-const DB_PATH = path.join(process.cwd(), 'prisma', 'dev.db');
-const adapter = new PrismaBetterSqlite3({ url: `file:${DB_PATH}` });
+// Use DATABASE_URL from .env (same as prisma.config.ts)
+const dbUrl = process.env.DATABASE_URL || 'file:./dev.db';
+const adapter = new PrismaBetterSqlite3({ url: dbUrl.startsWith('file:') ? dbUrl : `file:${dbUrl}` });
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
@@ -147,9 +149,27 @@ async function main() {
     }
     console.log(`✅ Triage Records: ${triages.length} seeded`);
 
+    // ═══ EMERGENCY CONTACTS ═══
+    const emergencyContacts = [
+        { id: 'ec-001', patientId: 'pat-001', name: 'John Wilson', phone: '07700 900101', relationship: 'Husband', isPrimary: true },
+        { id: 'ec-002', patientId: 'pat-004', name: 'Mark Jenkins', phone: '07700 900104', relationship: 'Husband', isPrimary: true },
+        { id: 'ec-003', patientId: 'pat-005', name: 'Mary Thompson', phone: '07700 900105', relationship: 'Wife', isPrimary: true },
+        { id: 'ec-004', patientId: 'pat-007', name: 'Priya Patel', phone: '07700 900107', relationship: 'Wife', isPrimary: true },
+        { id: 'ec-005', patientId: 'pat-008', name: 'Ana Popescu', phone: '07700 900108', relationship: 'Sister', isPrimary: true },
+        { id: 'ec-006', patientId: 'pat-002', name: 'Ahmed Khan', phone: '07700 900102', relationship: 'Father', isPrimary: true },
+        { id: 'ec-007', patientId: 'pat-003', name: 'Carol Bennett', phone: '07700 900103', relationship: 'Mother', isPrimary: true },
+        { id: 'ec-008', patientId: 'pat-006', name: 'Omar Hassan', phone: '07700 900106', relationship: 'Father', isPrimary: true },
+    ];
+
+    for (const ec of emergencyContacts) {
+        await prisma.emergencyContact.upsert({ where: { id: ec.id }, update: {}, create: ec });
+    }
+    console.log(`✅ Emergency Contacts: ${emergencyContacts.length} seeded`);
+
     console.log('\n🎉 Database seeded successfully!');
     console.log(`   • 1 Practice  • ${patientsData.length} Patients  • ${appts.length} Appointments`);
     console.log(`   • ${callsData.length} Calls  • ${rxData.length} Prescriptions  • ${tests.length} Tests  • ${triages.length} Triages`);
+    console.log(`   • ${emergencyContacts.length} Emergency Contacts`);
 }
 
 main()
