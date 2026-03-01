@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, ReactNode } from 'react';
-import { HeartPulse, Brain, Droplets, Thermometer, Calendar, Pill, FlaskConical, Clock, User, Stethoscope, ClipboardList, ShieldAlert, Mic, ArrowUp, Paperclip, Settings, Volume2, AlertTriangle, RefreshCw, ChevronLeft, ChevronDown, CheckCircle2, X, PhoneCall } from 'lucide-react';
+import { HeartPulse, Brain, Droplets, Thermometer, Calendar, Pill, FlaskConical, Clock, User, Stethoscope, ClipboardList, ShieldAlert, Mic, ArrowUp, Paperclip, Settings, Volume2, AlertTriangle, RefreshCw, ChevronLeft, ChevronDown, CheckCircle2, X, PhoneCall, Zap, ChevronRight } from 'lucide-react';
 import EmmaLogo from '@/components/EmmaLogo';
 import { useVoice } from '@/hooks/useVoice';
 import { ConversationState, AgentType, IntentType, UrgencyLevel } from '@/lib/types';
@@ -63,6 +63,10 @@ export default function DemoPage() {
     const [rfs, setRfs] = useState<string[]>([]);
     const [showVoicePanel, setShowVoicePanel] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [cortexMode, setCortexMode] = useState(true);
+    const [cortexPlan, setCortexPlan] = useState<{ step: number; tool: string; result: string; success: boolean; durationMs: number }[] | null>(null);
+    const [selfScore, setSelfScore] = useState<number | null>(null);
+    const [showVersionMenu, setShowVersionMenu] = useState(false);
     const endRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -94,7 +98,8 @@ export default function DemoPage() {
         setLoading(true);
 
         try {
-            const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text.trim(), conversationState: convState }) });
+            const endpoint = cortexMode ? '/api/cortex' : '/api/chat';
+            const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text.trim(), conversationState: convState }) });
             const d = await res.json();
 
             if (d.error) {
@@ -104,6 +109,8 @@ export default function DemoPage() {
                 setMessages(p => [...p, aMsg]);
                 setConvState(d.conversationState);
                 setMeta(d.metadata || {});
+                if (d.plan?.steps) setCortexPlan(d.plan.steps);
+                if (d.evaluation?.overallScore) setSelfScore(d.evaluation.overallScore);
 
                 if (d.metadata?.snomedCodes) setSyms(p => { const s = new Set(p.map(x => x.code)); return [...p, ...d.metadata.snomedCodes.filter((c: { code: string }) => !s.has(c.code))]; });
                 if (d.metadata?.actionsPerformed) setActs(p => [...p, ...d.metadata.actionsPerformed]);
@@ -116,13 +123,14 @@ export default function DemoPage() {
         }
         setLoading(false);
         inputRef.current?.focus();
-    }, [loading, convState, voice]);
+    }, [loading, convState, voice, cortexMode]);
 
     const reset = () => {
         voice.stopSpeaking();
         const greeting = `Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, you've reached Riverside Medical Centre. My name's EMMA, and I'm here to help. How can I help you today?`;
         setMessages([{ id: 'greet', role: 'assistant', content: greeting, timestamp: new Date().toISOString(), metadata: { agent: 'orchestrator' } }]);
         setConvState(null); setMeta({}); setSyms([]); setActs([]); setRfs([]); setInput('');
+        setCortexPlan(null); setSelfScore(null);
         if (voice.voiceEnabled && voice.autoSpeak) setTimeout(() => voice.speak(greeting), 300);
     };
 
@@ -139,9 +147,22 @@ export default function DemoPage() {
             <div className="z-chat-container">
                 {/* Top Right Header (Zyricon style config dropdown area) */}
                 <div style={{ padding: '24px 32px 0', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '16px' }}>
-                    <div style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.05)', borderRadius: '20px', fontSize: '0.8125rem', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                        <span>EMMA Core v4.0</span>
-                        <ChevronDown size={14} />
+                    <div style={{ position: 'relative' }}>
+                        <div onClick={() => setShowVersionMenu(!showVersionMenu)} style={{ padding: '8px 16px', background: cortexMode ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.05)', borderRadius: '20px', fontSize: '0.8125rem', color: cortexMode ? '#A78BFA' : 'var(--text-secondary)', border: `1px solid ${cortexMode ? 'rgba(124,58,237,0.3)' : 'var(--border-subtle)'}`, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', transition: 'all 0.2s' }}>
+                            {cortexMode ? <Zap size={14} /> : <Brain size={14} />}
+                            <span>{cortexMode ? 'EMMA Cortex v5.0' : 'EMMA Core v4.0'}</span>
+                            <ChevronDown size={14} />
+                        </div>
+                        {showVersionMenu && (
+                            <div style={{ position: 'absolute', top: '40px', left: 0, background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '8px 0', zIndex: 100, minWidth: '200px', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                                <div onClick={() => { setCortexMode(false); setShowVersionMenu(false); }} style={{ padding: '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8125rem', color: !cortexMode ? '#A78BFA' : 'var(--text-secondary)' }}>
+                                    <Brain size={14} /> EMMA Core v4.0 <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>Linear</span>
+                                </div>
+                                <div onClick={() => { setCortexMode(true); setShowVersionMenu(false); }} style={{ padding: '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8125rem', color: cortexMode ? '#A78BFA' : 'var(--text-secondary)' }}>
+                                    <Zap size={14} /> EMMA Cortex v5.0 <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>Autonomous</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
                     <button className="zs-card-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>Right Panel {!sidebarOpen && <ChevronLeft size={14} />}</div>
@@ -286,6 +307,39 @@ export default function DemoPage() {
             {/* ═══ Sidebar ═══ */}
             {sidebarOpen && (
                 <div style={{ width: '340px', background: 'rgba(22, 18, 30, 0.6)', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)', borderLeft: '1px solid var(--border-subtle)', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto', transition: 'all 0.3s', zIndex: 10 }}>
+                    {/* Cortex Execution Plan */}
+                    {cortexMode && cortexPlan && cortexPlan.length > 0 && (
+                        <div className="cs-section">
+                            <h4 style={{ fontSize: '0.8125rem', color: '#A78BFA', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}><Zap size={14} /> Cortex Plan ({cortexPlan.length} steps)</h4>
+                            {cortexPlan.map((s, i) => (
+                                <div key={i} style={{ fontSize: '0.75rem', padding: '8px 10px', display: 'flex', gap: '8px', alignItems: 'flex-start', background: s.success ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${s.success ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'}`, borderRadius: '10px', marginBottom: '6px' }}>
+                                    <span style={{ color: s.success ? '#22C55E' : '#EF4444', fontWeight: 600, flexShrink: 0 }}>{i + 1}.</span>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ color: 'var(--text-primary)', fontWeight: 500, marginBottom: '2px' }}>{s.tool.replace(/_/g, ' ')}</div>
+                                        <div style={{ color: 'var(--text-muted)', fontSize: '0.6875rem', lineHeight: 1.3 }}>{s.result?.slice(0, 80)}{s.result?.length > 80 ? '...' : ''}</div>
+                                    </div>
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.625rem', flexShrink: 0 }}>{s.durationMs}ms</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Self-Evaluation Score */}
+                    {cortexMode && selfScore !== null && (
+                        <div className="cs-section">
+                            <h4 style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Self-Evaluation</h4>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--bg-glass)', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
+                                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: `conic-gradient(${selfScore >= 7 ? '#22C55E' : selfScore >= 5 ? '#F59E0B' : '#EF4444'} ${selfScore * 36}deg, rgba(255,255,255,0.1) 0deg)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{selfScore}</span>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-primary)', fontWeight: 500 }}>{selfScore >= 8 ? 'Excellent' : selfScore >= 6 ? 'Good' : selfScore >= 4 ? 'Adequate' : 'Needs Improvement'}</div>
+                                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Clinical safety + efficiency + empathy</div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Active Agent */}
                     <div className="cs-section">
                         <h4 style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Active Agent</h4>
