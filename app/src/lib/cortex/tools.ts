@@ -586,6 +586,137 @@ const scheduleFollowup: CortexTool = {
 };
 
 // ═══════════════════════════════════════════════════════════
+// TOOL 12: lookup_nhs_patient (REAL NHS PDS FHIR R4)
+// ═══════════════════════════════════════════════════════════
+
+const lookupNHSPatient: CortexTool = {
+    name: 'lookup_nhs_patient',
+    description: 'Look up a patient on the REAL NHS Personal Demographics Service (PDS) using FHIR R4 API. Returns demographics, GP practice, address, etc. Use this to cross-check patient identity against the national NHS database. Requires a valid 10-digit NHS number.',
+    parameters: {
+        type: 'object',
+        properties: {
+            nhs_number: { type: 'string', description: 'NHS number (10 digits)' },
+        },
+        required: ['nhs_number'],
+    },
+    async execute(params) {
+        const { lookupPatientByNHSNumber, validateNHSNumber } = await import('../nhs/pds');
+        const nhs = String(params.nhs_number).replace(/\s+/g, '');
+
+        // Validate format first
+        const validation = validateNHSNumber(nhs);
+        if (!validation.valid) {
+            return { success: false, data: {}, observation: `Invalid NHS number: ${validation.error}` };
+        }
+
+        const patient = await lookupPatientByNHSNumber(nhs);
+        if (!patient) {
+            return { success: false, data: {}, observation: `No patient found on NHS PDS with number ${nhs}.` };
+        }
+
+        const addr = patient.address
+            ? `${patient.address.line.join(', ')}, ${patient.address.city} ${patient.address.postalCode}`
+            : 'Not available';
+
+        return {
+            success: true,
+            data: { patient },
+            observation: `NHS PDS Record found:\n• Name: ${patient.title || ''} ${patient.firstName} ${patient.lastName}\n• DOB: ${patient.dateOfBirth}\n• Gender: ${patient.gender}\n• NHS#: ${patient.nhsNumber}\n• Address: ${addr}\n• Phone: ${patient.phone || 'Not recorded'}\n• GP Practice: ${patient.gpPractice ? `${patient.gpPractice.name} (ODS: ${patient.gpPractice.odsCode})` : 'Not registered'}\n• Deceased: ${patient.isDeceased ? 'YES' : 'No'}\n• Restricted record: ${patient.securitySensitive ? 'YES — handle with care' : 'No'}`,
+        };
+    }
+};
+
+// ═══════════════════════════════════════════════════════════
+// TOOL 13: validate_nhs_number
+// ═══════════════════════════════════════════════════════════
+
+const validateNHSTool: CortexTool = {
+    name: 'validate_nhs_number',
+    description: 'Validate an NHS number using the standard Modulus 11 check digit algorithm. Does NOT query the NHS — just validates the format. Use before making PDS lookups.',
+    parameters: {
+        type: 'object',
+        properties: {
+            nhs_number: { type: 'string', description: 'NHS number to validate (10 digits)' },
+        },
+        required: ['nhs_number'],
+    },
+    async execute(params) {
+        const { validateNHSNumber } = await import('../nhs/pds');
+        const result = validateNHSNumber(String(params.nhs_number));
+        return {
+            success: result.valid,
+            data: { valid: result.valid, error: result.error },
+            observation: result.valid
+                ? `✅ NHS number ${params.nhs_number} is valid (Modulus 11 check passed).`
+                : `❌ NHS number ${params.nhs_number} is INVALID: ${result.error}`,
+        };
+    }
+};
+
+// ═══════════════════════════════════════════════════════════
+// TOOL 14: find_nhs_services
+// ═══════════════════════════════════════════════════════════
+
+const findNHSServices: CortexTool = {
+    name: 'find_nhs_services',
+    description: 'Search for real NHS services — GP practices, pharmacies, hospitals. Uses the NHS ODS (Organisation Data Service) API. Can search by postcode, name, or ODS code.',
+    parameters: {
+        type: 'object',
+        properties: {
+            service_type: { type: 'string', description: '"gp", "pharmacy", or "organisation"' },
+            postcode: { type: 'string', description: 'Postcode to search near (e.g. "SW1A 1AA")' },
+            name: { type: 'string', description: 'Organisation name to search for' },
+            ods_code: { type: 'string', description: 'Specific ODS code to look up' },
+        },
+        required: ['service_type'],
+    },
+    async execute(params) {
+        const { lookupOrganisation, searchGPPractices, searchPharmacies } = await import('../nhs/spine');
+        const type = String(params.service_type).toLowerCase();
+
+        // Direct ODS lookup
+        if (params.ods_code) {
+            const org = await lookupOrganisation(String(params.ods_code));
+            if (!org) return { success: false, data: {}, observation: `Organisation with ODS code ${params.ods_code} not found.` };
+            return {
+                success: true,
+                data: { organisation: org },
+                observation: `NHS Organisation found:\n• Name: ${org.name}\n• ODS Code: ${org.odsCode}\n• Type: ${org.type}\n• Address: ${org.address.line.join(', ')}, ${org.address.city} ${org.address.postalCode}\n• Phone: ${org.phone || 'Not listed'}\n• Status: ${org.status}`,
+            };
+        }
+
+        // Search by type
+        if (type === 'gp' || type === 'practice') {
+            const practices = await searchGPPractices({
+                postCode: params.postcode as string,
+                name: params.name as string,
+            });
+            if (practices.length === 0) return { success: false, data: {}, observation: 'No GP practices found matching your criteria.' };
+            return {
+                success: true,
+                data: { practices },
+                observation: `Found ${practices.length} GP practices:\n${practices.map((p, i) => `${i + 1}. ${p.name} (ODS: ${p.odsCode}) — ${p.address.city} ${p.address.postalCode}`).join('\n')}`,
+            };
+        }
+
+        if (type === 'pharmacy' || type === 'chemist') {
+            const pharmacies = await searchPharmacies({
+                postCode: params.postcode as string,
+                name: params.name as string,
+            });
+            if (pharmacies.length === 0) return { success: false, data: {}, observation: 'No pharmacies found matching your criteria.' };
+            return {
+                success: true,
+                data: { pharmacies },
+                observation: `Found ${pharmacies.length} pharmacies:\n${pharmacies.map((p, i) => `${i + 1}. ${p.name} (ODS: ${p.odsCode}) — ${p.address}`).join('\n')}`,
+            };
+        }
+
+        return { success: false, data: {}, observation: 'Unknown service type. Use "gp", "pharmacy", or provide an ODS code.' };
+    }
+};
+
+// ═══════════════════════════════════════════════════════════
 // EXPORT ALL TOOLS
 // ═══════════════════════════════════════════════════════════
 
@@ -602,6 +733,9 @@ export function getAllTools(): CortexTool[] {
         createGPAlert,
         saveEpisode,
         scheduleFollowup,
+        lookupNHSPatient,
+        validateNHSTool,
+        findNHSServices,
     ];
 }
 
