@@ -10,6 +10,11 @@
 [![Powered by Groq](https://img.shields.io/badge/Groq-LPU_Inference-orange?style=for-the-badge)](https://groq.com)
 [![Prisma ORM](https://img.shields.io/badge/Prisma-SQLite-2D3748?style=for-the-badge&logo=prisma)](https://prisma.io)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://typescriptlang.org)
+[![Status](https://img.shields.io/badge/Status-Under_Active_Development-brightgreen?style=for-the-badge)](https://github.com/Waqar53/EMMA)
+
+> ⚡ **This project is under active development.** What you see below is what's been built and tested so far.
+> The vision is much bigger — I'm shipping new features weekly to make EMMA the most capable
+> autonomous medical AI agent ever built. Watch this repo to follow the journey.
 
 <br/>
 
@@ -338,14 +343,43 @@ DATABASE_URL=file:./dev.db
 
 ---
 
-## 🔮 What's Next
+## � Development Status
 
-- [ ] **Voice integration** — Real-time speech-to-text with Whisper
-- [ ] **Multi-practice** — SaaS deployment for multiple GP surgeries
-- [ ] **NHS login** — CIS2 smartcard authentication
-- [ ] **FHIR R4** — Full HL7 FHIR resource exchange
-- [ ] **Waiting room screen** — Live queue display
-- [ ] **GP mobile app** — Push notifications for red flags
+> **EMMA is not fully complete yet — and that's the point.**
+>
+> What you see above is what's been built, tested, and working right now. But the vision is 10x bigger.
+> I'm actively building the most advanced autonomous medical AI agent, shipping new features every week.
+> This is a living project — the best features are still coming.
+
+### ✅ Completed (What's Working Now)
+
+- [x] Autonomous ReAct agent loop with 18 tools
+- [x] Real-time clinical triage (NICE guidelines + SNOMED-CT)
+- [x] Emergency 999 protocol with SMS alerts
+- [x] Appointment booking, cancellation, and management
+- [x] Prescription request system with pharmacy routing
+- [x] Live analytics dashboard with real DB metrics
+- [x] 8-engine Command Centre
+- [x] Twilio SMS/WhatsApp integration (real messages)
+- [x] Self-evaluation engine (scores every interaction)
+- [x] Proactive scheduler (recall campaigns + check-ins)
+- [x] Patient memory persistence across conversations
+- [x] Inbound SMS webhook (patient replies auto-processed)
+
+### 🔮 Coming Next — The Craziest Features
+
+- [ ] 🎙️ **Real-time Voice** — Live speech-to-text with Whisper, voice synthesis with ElevenLabs. Actual phone call handling.
+- [ ] 🧬 **Multi-Agent Swarm** — Specialized sub-agents (triage agent, pharmacy agent, mental health agent) that collaborate autonomously
+- [ ] 🏥 **Multi-Practice SaaS** — Deploy EMMA across multiple GP surgeries with tenant isolation
+- [ ] 🔐 **NHS CIS2 Login** — Smartcard authentication for GP access
+- [ ] 🔄 **FHIR R4 Exchange** — Full HL7 FHIR resource read/write with NHS systems
+- [ ] 📺 **Waiting Room Display** — Real-time queue board for patients
+- [ ] 📱 **GP Mobile App** — Push notifications for red flags, instant escalation approval
+- [ ] 🌍 **Multi-Language** — Live translation for non-English speaking patients (Urdu, Punjabi, Polish, Bengali)
+- [ ] 🧪 **A/B Testing Engine** — Compare agent strategies, auto-optimize for patient outcomes
+- [ ] 📡 **Live Vitals Integration** — Wearable device data feeds (Apple Watch, Fitbit) for proactive health monitoring
+- [ ] 🤖 **Autonomous Referral System** — AI-generated referral letters sent directly to secondary care
+- [ ] 🧠 **Continuous Learning** — EMMA improves from every conversation, self-training loop
 
 ---
 
