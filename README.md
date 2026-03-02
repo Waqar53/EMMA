@@ -383,9 +383,9 @@ DATABASE_URL=file:./dev.db
 
 ---
 
-## 👨‍💻 Built By
+## 👨‍💻 Built By Me
 
-**Waqar Azim** — Full-stack AI engineer building autonomous agents that solve real-world healthcare problems.
+**Waqar Azim** — AI engineer building autonomous agents that solve real-world healthcare problems.
 
 - 🧠 Designed and implemented the entire autonomous ReAct agent architecture
 - 🏥 Built clinical safety protocols aligned with NHS NICE guidelines
