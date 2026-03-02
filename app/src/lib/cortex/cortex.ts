@@ -154,6 +154,7 @@ Out-of-hours: ${practice.oohNumber}
 // ── The Core ReAct Loop ──
 
 const MAX_STEPS = 12;
+let lastEvaluation: CortexEvaluation | null = null; // cached from background eval
 
 export async function runCortex(
     userMessage: string,
@@ -336,10 +337,13 @@ export async function runCortex(
         totalDurationMs: totalDuration,
     };
 
-    // ── 8. Self-Evaluation (async, non-blocking) ──
-    let evaluation: CortexEvaluation | null = null;
+    // ── 8. Self-Evaluation (fire-and-forget — don't block the response) ──
+    let evaluation: CortexEvaluation | null = lastEvaluation; // use cached from previous turn
     if (steps.length > 0) {
-        evaluation = await selfEvaluate(userMessage, finalResponse, steps, state);
+        // Run in background — result cached for next request
+        selfEvaluate(userMessage, finalResponse, steps, state)
+            .then(ev => { lastEvaluation = ev; })
+            .catch(err => console.warn('Self-evaluation background error:', err));
     }
 
     // ── 9. Persist to database (fire-and-forget) ──

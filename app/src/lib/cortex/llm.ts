@@ -7,11 +7,38 @@
 import Groq from 'groq-sdk';
 import type { CortexTool } from './tools';
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || '' });
+// Lazy Groq client — always reads current env
+let _groqClient: Groq | null = null;
+function getGroq(): Groq {
+    if (!_groqClient) {
+        _groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY || '' });
+    }
+    return _groqClient;
+}
 
 const OLLAMA_BASE = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.2:3b';
 const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+
+// ── Ollama Health Cache (avoid 60s timeout when Ollama is down) ──
+let ollamaHealthy = false;
+let ollamaLastCheck = 0;
+const OLLAMA_CHECK_INTERVAL = 30_000; // re-check every 30s
+
+async function isOllamaAvailable(): Promise<boolean> {
+    const now = Date.now();
+    if (now - ollamaLastCheck < OLLAMA_CHECK_INTERVAL) return ollamaHealthy;
+    try {
+        const res = await fetch(`${OLLAMA_BASE}/api/tags`, {
+            signal: AbortSignal.timeout(500), // 500ms max — instant check
+        });
+        ollamaHealthy = res.ok;
+    } catch {
+        ollamaHealthy = false;
+    }
+    ollamaLastCheck = now;
+    return ollamaHealthy;
+}
 
 // ── Types ──
 
@@ -92,7 +119,7 @@ async function callOllama(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(60000), // 60s timeout
+        signal: AbortSignal.timeout(15000), // 15s timeout (was 60s)
     });
 
     if (!res.ok) {
@@ -149,7 +176,7 @@ async function callGroq(
         params.tool_choice = 'auto';
     }
 
-    const completion = await groq.chat.completions.create(params);
+    const completion = await getGroq().chat.completions.create(params);
     const choice = completion.choices[0];
     const toolCalls: ToolCall[] = (choice?.message?.tool_calls || []).map(tc => ({
         id: tc.id,
@@ -184,26 +211,34 @@ export async function callCortexLLM(
             return await callGroq(messages, tools, options);
         } catch (err) {
             console.warn('⚠️ Groq failed, trying Ollama:', err);
-            return await callOllama(messages, tools, options);
+            if (await isOllamaAvailable()) {
+                return await callOllama(messages, tools, options);
+            }
+            throw err;
         }
     }
 
-    // Default: try Ollama first (free, unlimited)
-    try {
-        return await callOllama(messages, tools, options);
-    } catch (err) {
-        console.warn('⚠️ Ollama unavailable, falling back to Groq:', err);
+    // Default: try Ollama first — but ONLY if it's actually running
+    const ollamaUp = await isOllamaAvailable();
+    if (ollamaUp) {
         try {
-            return await callGroq(messages, tools, options);
-        } catch (groqErr) {
-            console.error('❌ Both LLM providers failed:', groqErr);
-            return {
-                content: "I'm experiencing a brief technical delay. Could you repeat what you said?",
-                toolCalls: [],
-                model: 'fallback',
-                provider: 'groq',
-            };
+            return await callOllama(messages, tools, options);
+        } catch (err) {
+            console.warn('⚠️ Ollama call failed, falling back to Groq:', err);
         }
+    }
+
+    // Groq fallback (or primary when Ollama not running)
+    try {
+        return await callGroq(messages, tools, options);
+    } catch (groqErr) {
+        console.error('❌ Both LLM providers failed:', groqErr);
+        return {
+            content: "I'm experiencing a brief technical delay. Could you repeat what you said?",
+            toolCalls: [],
+            model: 'fallback',
+            provider: 'groq',
+        };
     }
 }
 
