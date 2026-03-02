@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🧠 EMMA — Autonomous AI GP Receptionist
+#  EMMA — Autonomous AI GP Receptionist
 
 ### *The World's First Fully Autonomous Medical AI Receptionist*
 
@@ -32,7 +32,7 @@
 
 ---
 
-## 🔥 Why This Exists
+##  Why This Exists
 
 GP surgeries in the UK handle **300+ calls daily**. Patients wait **23 minutes on average** just to speak to a human. Critical emergencies get lost in queues. Receptionists burn out.
 
@@ -160,7 +160,7 @@ EMMA isn't just a chatbot. She's a **platform** with 8 specialized AI engines:
 
 ---
 
-## 📊 Live Dashboard
+##  Live Dashboard
 
 Real-time practice analytics pulled from the database:
 
@@ -175,7 +175,7 @@ Real-time practice analytics pulled from the database:
 
 ---
 
-## 🧬 Tech Stack
+##  Tech Stack
 
 | Layer | Technology | Why |
 |-------|-----------|-----|
@@ -270,7 +270,7 @@ app/
 
 ---
 
-## 🚀 Quick Start
+##  Quick Start
 
 ```bash
 # Clone
@@ -314,7 +314,7 @@ DATABASE_URL=file:./dev.db
 
 ---
 
-## 📈 Performance
+##  Performance
 
 | Metric | Value |
 |--------|-------|
@@ -328,7 +328,7 @@ DATABASE_URL=file:./dev.db
 
 ---
 
-## 🧪 Tested Scenarios
+##  Tested Scenarios
 
 | Scenario | Tools Called | Result |
 |----------|------------|--------|
