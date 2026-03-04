@@ -14,8 +14,8 @@
 
 > ⚡ **This project is under active development.** What you see below is what's been built and tested so far.
 > The vision is much bigger — I'm shipping new features weekly to make EMMA the most capable
-> autonomous medical AI agent ever built. Watch this repo to follow the journey.
-
+> autonomous medical AI agent ever built. Watch this repo to follow the journey .
+Check it out live : https://app-ashy-seven-13.vercel.app/
 <br/>
 
 > **EMMA doesn't just answer phones — she thinks, reasons, acts, learns, and protects patients.**
